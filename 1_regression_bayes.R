@@ -1,9 +1,10 @@
 rm(list=ls())
-setwd ("C:/Users/timgr/OneDrive - Wilfrid Laurier University/Academic/UK Nuclear Energy/")
 options(scipen=999)
 select <- dplyr::select
 vars <- dplyr::vars
 coalesce <- dplyr::coalesce
+
+getwd()
 
 library(tidyverse)
 library(haven)
@@ -21,8 +22,8 @@ library(scales)
 library(ggh4x)
 library(openxlsx)
 
-data.0 <- read_csv("UK_SMNR.csv")
-saveRDS(data.00, "./Data/UK_SMNR.rds")
+data.url <- "https://raw.githubusercontent.com/tgravelle/nuclear-energy-uk/refs/heads/main/UK_SMNR.csv"
+data.0 <- read_csv(data.url)
 
 summary(data.0$weight)
 
@@ -56,7 +57,8 @@ data.1 <- data.0 %>%
     SMNR_UK == 6 | SMNP_UK == 6 | SMNR_LOCAL == 6 | SMNP_LOCAL == 6 ~ 3,
     TRUE ~ 3
   )) %>%
-  mutate(RPS = fct_relevel(RPS, "Power Station")) %>%
+  mutate(RPS = fct_relevel(as_factor(RPS), "Power Station", "Reactor")) %>%
+  mutate(LOC = fct_relevel(as_factor(LOC), "UK", "Local")) %>%
   mutate(Female = case_when(
     GENDER == 1 ~ 0,
     GENDER == 2 ~ 1,
@@ -453,7 +455,7 @@ model.out <- function(model_obj){
     filter(term %in% c("ELPD", "LOOIC")) %>%
     select(term, Estimate, Est.Error)
   RMSE <- bayes_rmse(model_obj)
-  sigma <- broom::tidy(model_obj) %>%
+  sigma <- broom.mixed::tidy(model_obj) %>%
     filter(term == "sd__Observation") %>%
     mutate(term = "Sigma") %>%
     rename(Estimate = estimate,
@@ -480,7 +482,7 @@ model.out(m0)
 model.out(m1)
 model.out(m2)
 model.out(m3)
-saveWorkbook(work_book, "Bayesian models-nuclear energy-2026 10 08.xlsx", overwrite = TRUE)
+saveWorkbook(work_book, "./appendix/Bayesian models-nuclear energy-2026 10 20.xlsx", overwrite = TRUE)
 
 ## Plot of unadjusted means by condition
 score_means <- c("UK", "Local") %>%
@@ -526,11 +528,10 @@ fig.0 <- ggplot(data = pred.means, aes(x = RPS, y = Estimate, fill = RPS)) +
 
 fig.0
 
-ggsave(plot = fig.0, file = paste0("C:/Users/timgr/OneDrive - Wilfrid Laurier University/Academic/UK Nuclear Energy/",
-                                   "Fig 0-Means by condition 2026 10 08.png"),
+ggsave(plot = fig.0, file = "./manuscript/Fig 0-Means by condition 2026 10 20.png",
        device = "png",  width = 6.5, height = 3, units = "in", dpi = 1200)
 
-## Coefficient plot
+## Fig. 2: Coefficient plot
 coef.ci.m1 <- m1 %>%
   broom::tidy(., conf.int = TRUE) %>%
   filter(effect == "fixed") %>%
@@ -681,7 +682,7 @@ coef.ci.support <- bind_rows(coef.ci.m1, coef.ci.m2, coef.ci.m3) %>%
     model.name == "Model 3" ~ 0.65
   ))
 
-fig.1 <- ggplot(data = coef.ci.support, aes(x = estimate, y = coef.label, colour = model.name)) +
+fig.2 <- ggplot(data = coef.ci.support, aes(x = estimate, y = coef.label, colour = model.name)) +
   geom_vline(xintercept = 0, colour = "grey72", linewidth = 0.5, linetype = "longdash") +
   geom_pointrange(aes(x = estimate, y = coef.label, xmin = LCL, xmax = UCL, colour = model.name),
                   shape = coef.ci.support$pt.shape, size = coef.ci.support$pt.size,
@@ -702,10 +703,9 @@ fig.1 <- ggplot(data = coef.ci.support, aes(x = estimate, y = coef.label, colour
         legend.position = c(0.14, 0.94),
         legend.text = element_text(size = 9, colour = "black"))
 
-fig.1
+fig.2
 
-ggsave(plot = fig.1, file = paste0("C:/Users/timgr/OneDrive - Wilfrid Laurier University/Academic/UK Nuclear Energy/",
-                                   "Fig 1-Coefficient plot-2026 10 08.png"),
+ggsave(plot = fig.2, file = "./manuscript/Fig 2-Coefficient plot-2026 10 20.png",
        device = "png",  width = 6, height = 8.25, units = "in", dpi = 1200)
 
 coef.ci.support.exp.dist <- coef.ci.support %>%
@@ -719,7 +719,7 @@ coef.ci.support.exp.dist <- coef.ci.support %>%
                            "N. Ireland × Local area frame")) %>%
   mutate(coef.label = fct_drop(coef.label))
 
-fig.1a <- ggplot(data = coef.ci.support.exp.dist, aes(x = estimate, y = coef.label, colour = model.name)) +
+fig.2a <- ggplot(data = coef.ci.support.exp.dist, aes(x = estimate, y = coef.label, colour = model.name)) +
   geom_vline(xintercept = 0, colour = "grey72", linewidth = 0.5, linetype = "longdash") +
   geom_pointrange(aes(x = estimate, y = coef.label, xmin = LCL, xmax = UCL, colour = model.name),
                   shape = coef.ci.support.exp.dist$pt.shape, size = coef.ci.support.exp.dist$pt.size,
@@ -740,13 +740,12 @@ fig.1a <- ggplot(data = coef.ci.support.exp.dist, aes(x = estimate, y = coef.lab
         legend.position = c(0.14, 0.92),
         legend.text = element_text(size = 9, colour = "black"))
 
-fig.1a
+fig.2a
 
-ggsave(plot = fig.1a, file = paste0("C:/Users/timgr/OneDrive - Wilfrid Laurier University/Academic/UK Nuclear Energy/",
-                                    "Fig 1a-Coefficient plot-2026 10 08.png"),
+ggsave(plot = fig.2a, file = "./manuscript/Fig 2a-Coefficient plot-2026 10 20.png",
        device = "png",  width = 6, height = 6, units = "in", dpi = 1200)
 
-## Fig. 2: Effect of power station/reactor frames
+## Fig. 3: Effect of power station/reactor frames
 score_reactor <- c("England", "Scotland", "Wales", "Northern Ireland") %>%
   as_tibble() %>%
   mutate(Country = as_factor(value)) %>%
@@ -778,7 +777,7 @@ pred.country.reactor <- fitted(m3, score_reactor, probs = c(0.085, 0.915), cores
   select(Country, RPS, Estimate, Est.Error, LCL, UCL)
 print(pred.country.reactor, digits = 3)
 
-fig.2 <- ggplot(data = pred.country.reactor, aes(x = RPS, y = Estimate, fill = RPS)) +
+fig.3 <- ggplot(data = pred.country.reactor, aes(x = RPS, y = Estimate, fill = RPS)) +
   geom_bar(aes(y = Estimate+0.5), stat = "identity", width = 0.6, position = position_dodge(0.75)) +
   scale_fill_manual(values = c("Power Station" = "grey84", "Reactor" = "grey30")) +
   geom_errorbar(aes(ymin = LCL+0.5, ymax = UCL+0.5),
@@ -798,13 +797,12 @@ fig.2 <- ggplot(data = pred.country.reactor, aes(x = RPS, y = Estimate, fill = R
         strip.text.x = element_text(size = 10, colour = "black"),
         legend.position = "none")
 
-fig.2
+fig.3
 
-ggsave(plot = fig.2, file = paste0("C:/Users/timgr/OneDrive - Wilfrid Laurier University/Academic/UK Nuclear Energy/",
-                                   "Fig 2-Effect plot-Country x reactor 2026 10 08.png"),
+ggsave(plot = fig.3, file = "./manuscript/Fig 3-Effect plot-Country x reactor 2026 10 20.png",
        device = "png",  width = 6.5, height = 6, units = "in", dpi = 1200)
 
-## Fig. 3: Effect of UK/local frames
+## Fig. 4: Effect of UK/local frames
 score_uk_local <- c("England", "Scotland", "Wales", "Northern Ireland") %>%
   as_tibble() %>%
   mutate(Country = as_factor(value)) %>%
@@ -843,7 +841,7 @@ pred.country.local <- fitted(m3, score_uk_local, probs = c(0.085, 0.915), cores 
   select(Country, LOC, Estimate, Est.Error, LCL, UCL)
 print(pred.country.local, digits = 3)
 
-fig.3 <- ggplot(data = pred.country.local, aes(x = LOC, y = Estimate, fill = LOC)) +
+fig.4 <- ggplot(data = pred.country.local, aes(x = LOC, y = Estimate, fill = LOC)) +
   geom_bar(aes(y = Estimate+0.5), stat = "identity", width = 0.6, position = position_dodge(0.75)) +
   scale_fill_manual(values = c("UK" = "grey84", "Local area" = "grey30")) +
   geom_errorbar(aes(ymin = LCL+0.5, ymax = UCL+0.5), position = position_dodge(0.75), width = 0.3, colour = "black", linewidth = 0.4) +
@@ -862,13 +860,12 @@ fig.3 <- ggplot(data = pred.country.local, aes(x = LOC, y = Estimate, fill = LOC
         strip.text.x = element_text(size = 10, colour = "black"),
         legend.position = "none")
 
-fig.3
+fig.4
 
-ggsave(plot = fig.3, file = paste0("C:/Users/timgr/OneDrive - Wilfrid Laurier University/Academic/UK Nuclear Energy/",
-                                   "Fig 3-Effect plot-Country x local 2026 10 08.png"),
+ggsave(plot = fig.4, file = "./manuscript/Fig 4-Effect plot-Country x local 2026 10 20.png",
        device = "png",  width = 6.5, height = 6, units = "in", dpi = 1200)
 
-## Fig. 4: Effect of distance to nuclear site (m3)
+## Fig. 5: Effect of distance to nuclear site (m3)
 score_dist <- as_tibble(seq(from = 0.1, to = 20, by = 0.1)) %>%
   bind_rows(as_tibble(seq(from = 21, to = 600, by = 1))) %>%
   rename(nuclear_dist_km = value) %>%
@@ -928,7 +925,7 @@ data.rug <- data.2 %>%
                                         "Scotland–UK frame","Scotland–Local area frame")) %>%
   select(ResponseId, Country, UK_Local, Country_UK_Local, nuclear_dist_km)
 
-fig.4 <- ggplot(data = pred.country.dist.uk.local, aes(y = Estimate, x = nuclear_dist_km, linetype = UK_Local)) +
+fig.5 <- ggplot(data = pred.country.dist.uk.local, aes(y = Estimate, x = nuclear_dist_km, linetype = UK_Local)) +
   geom_line(aes(), linewidth = 0.5) +
   geom_ribbon(aes(ymin = LCL, ymax = UCL), alpha = 0.1) +
   geom_rug(data = data.rug, aes(x = nuclear_dist_km), sides = "b", alpha = 0.4, linewidth = 0.4, inherit.aes = FALSE) +
@@ -958,13 +955,12 @@ fig.4 <- ggplot(data = pred.country.dist.uk.local, aes(y = Estimate, x = nuclear
         legend.position = c(0.125, 0.225),
         legend.text = element_text(size = 9, colour = "black"))
   
-fig.4
+fig.5
   
-ggsave(plot = fig.4, file = paste0("C:/Users/timgr/OneDrive - Wilfrid Laurier University/Academic/UK Nuclear Energy/",
-                                   "Fig 4-Effect plot-Country frame dist 2026 10 08.png"),
-       device = "png",  width = 6.5, height = 3, units = "in", dpi = 1200) 
+ggsave(plot = fig.5, file = "./manuscript/Fig 5-Effect plot-Country frame dist 2026 10 20.png",
+       device = "png",  width = 6.5, height = 3, units = "in", dpi = 1200)
 
-fig.4a <- ggplot(data = pred.country.dist.uk.local, aes(y = Estimate, x = nuclear_dist_km)) +
+fig.5a <- ggplot(data = pred.country.dist.uk.local, aes(y = Estimate, x = nuclear_dist_km)) +
   geom_line(aes(), linewidth = 0.5) +
   geom_ribbon(aes(ymin = LCL, ymax = UCL), alpha = 0.1) +
   geom_rug(data = data.rug, aes(x = nuclear_dist_km), sides = "b", alpha = 0.4, linewidth = 0.4, inherit.aes = FALSE) +
@@ -991,7 +987,7 @@ fig.4a <- ggplot(data = pred.country.dist.uk.local, aes(y = Estimate, x = nuclea
         axis.text.x.top = element_text(color = "black"),
         legend.position = "none")
 
-fig.4a
+fig.5a
 
-#ggsave(plot = fig.4a, file = "Fig 4a-Effect plot-Country frame dist 2026 10 08.png",
+#ggsave(plot = fig.5a, file = "./manuscript/Fig 5a-Effect plot-Country frame dist 2026 10 20.png",
 #       device = "png", width = 6.5, height = 6, units = "in", dpi = 1200)
