@@ -3,4 +3,4 @@ getwd()
 
 library(tinytex)
 
-latexmk("./manuscript/main.tex", pdf_file = "./manuscript/SMNRs in the UK-draft.pdf")
+latexmk("./manuscript/main.tex", clean = TRUE, pdf_file = "./manuscript/SMNRs in the UK-draft.pdf")
