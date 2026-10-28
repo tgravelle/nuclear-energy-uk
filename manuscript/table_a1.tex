@@ -1,0 +1,117 @@
+\begin{landscape}
+\renewcommand{\thetable}{A\arabic{table}}
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.06}
+
+\begin{longtable}[t]{>{\raggedright\arraybackslash}p{2.8in}rrcrrc}
+\caption{\label{tab:linear-models}Results: Linear models}\\
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{3}{c}{\textbf{Model 0}} & \multicolumn{3}{c}{\textbf{Model 1}} \\
+\cmidrule(l{3pt}r{3pt}){2-4} \cmidrule(l{3pt}r{3pt}){5-7}
+ & \textbf{Estimate} & \textbf{Est. Err.} & \textbf{95\% CrI} & \textbf{Estimate} & \textbf{Est. Err.} & \textbf{95\% CrI}\\
+\midrule
+\endfirsthead
+\caption[]{Results: Linear models \textit{(continued)}}\\
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{3}{c}{\textbf{Model 0}} & \multicolumn{3}{c}{\textbf{Model 1}} \\
+\cmidrule(l{3pt}r{3pt}){2-4} \cmidrule(l{3pt}r{3pt}){5-7}
+ & \textbf{Estimate} & \textbf{Est. Err.} & \textbf{95\% CrI} & \textbf{Estimate} & \textbf{Est. Err.} & \textbf{95\% CrI}\\
+\midrule
+\endhead
+
+\endfoot
+\bottomrule
+\endlastfoot
+Intercept & 0.331 & (0.015) & {}[0.301, 0.361] & 0.288 & (0.014) & {}[0.260, 0.317]\\
+Country (Ref. = England) &  &  &  &  &  & \\
+\hspace{1em}Wales & 0.013 & (0.035) & {}[$-$0.056, 0.081] & 0.015 & (0.032) & {}[$-$0.047, 0.079]\\
+\hspace{1em}Scotland & $-$0.119 & (0.027) & {}[$-$0.172, $-$0.066] & $-$0.114 & (0.025) & {}[$-$0.163, $-$0.065]\\
+\hspace{1em}Northern Ireland & 0.038 & (0.046) & {}[$-$0.051, 0.128] & 0.031 & (0.042) & {}[$-$0.052, 0.114]\\
+Female & $-$0.110 & (0.016) & {}[$-$0.141, $-$0.079] & $-$0.046 & (0.015) & {}[$-$0.076, $-$0.016]\\
+Age (Years logged) & 0.043 & (0.019) & {}[0.007, 0.080] & $-$0.083 & (0.019) & {}[$-$0.120, $-$0.045]\\
+Education & $-$0.018 & (0.022) & {}[$-$0.061, 0.024] & 0.012 & (0.021) & {}[$-$0.028, 0.053]\\
+Power source frame (Ref. = power station) &  &  &  &  &  & \\
+\hspace{1em}Reactor frame & $-$0.047 & (0.015) & {}[$-$0.075, $-$0.018] & $-$0.026 & (0.014) & {}[$-$0.053, 0.001]\\
+Location frame (Ref. = United Kingdom) &  &  &  &  &  & \\
+\hspace{1em}Local frame & $-$0.044 & (0.015) & {}[$-$0.072, $-$0.015] & $-$0.042 & (0.014) & {}[$-$0.069, $-$0.016]\\
+Distance to nearest nuclear site (km logged) & 0.027 & (0.012) & {}[0.003, 0.050] & 0.028 & (0.011) & {}[0.006, 0.049]\\
+Follow news about electricity &  &  &  & 0.153 & (0.028) & {}[0.099, 0.207]\\
+UK needs to produce a lot more electricity &  &  &  & 0.277 & (0.038) & {}[0.204, 0.351]\\
+UK should be self-sufficient in electricity &  &  &  & $-$0.015 & (0.040) & {}[$-$0.095, 0.063]\\
+Critical to keep the price of electricity in the UK low &  &  &  & 0.026 & (0.036) & {}[$-$0.045, 0.096]\\
+Trust in government (factor score) &  &  &  & 0.061 & (0.055) & {}[$-$0.049, 0.169]\\
+Trust in electricity companies/suppliers (factor score) &  &  &  & 0.106 & (0.036) & {}[0.036, 0.177]\\
+Concern with climate change (factor score) &  &  &  & $-$0.148 & (0.056) & {}[$-$0.257, $-$0.037]\\
+Ideology (left--right) &  &  &  & 0.197 & (0.033) & {}[0.133, 0.261]\\
+\midrule
+n & 1,276 &  &  & 1,276 &  & \\
+Bayes \textit{R}\textsuperscript{2} & 0.069 & (0.012) & {}[0.048, 0.094] & 0.212 & (0.017) & {}[0.178, 0.246]\\
+ELPD & $-$182.407 & (40.897) &  & $-$75.481 & (41.923) & \\
+LOOIC & 364.814 & (81.794) &  & 150.962 & (83.847) & \\
+Sigma & 0.276 & (0.006) & {}[0.266, 0.287] & 0.252 & (0.005) & {}[0.243, 0.262]\\
+RMSE & 0.275 & (0.001) &  & 0.250 & (0.001) & \\*
+\end{longtable}
+
+\newpage
+\addtocounter{table}{-1}
+
+\begin{longtable}[t]{>{\raggedright\arraybackslash}p{2.8in}rrcrrcrrc}
+\caption{Results: Linear models \textit{(continued)}}\\
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{3}{c}{\textbf{Model 2}} & \multicolumn{3}{c}{\textbf{Model 3}} & \multicolumn{3}{c}{\textbf{Model 4}} \\
+\cmidrule(l{3pt}r{3pt}){2-4} \cmidrule(l{3pt}r{3pt}){5-7} \cmidrule(l{3pt}r{3pt}){8-10}
+ & \textbf{Estimate} & \textbf{Est. Err.} & \textbf{95\% CrI} & \textbf{Estimate} & \textbf{Est. Err.} & \textbf{95\% CrI} & \textbf{Estimate} & \textbf{Est. Err.} & \textbf{95\% CrI}\\
+\midrule
+\endfirsthead
+\caption[]{Results: Linear models \textit{(continued)}}\\
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{3}{c}{\textbf{Model 2}} & \multicolumn{3}{c}{\textbf{Model 3}} & \multicolumn{3}{c}{\textbf{Model 4}} \\
+\cmidrule(l{3pt}r{3pt}){2-4} \cmidrule(l{3pt}r{3pt}){5-7} \cmidrule(l{3pt}r{3pt}){8-10}
+ & \textbf{Estimate} & \textbf{Est. Err.} & \textbf{95\% CrI} & \textbf{Estimate} & \textbf{Est. Err.} & \textbf{95\% CrI} & \textbf{Estimate} & \textbf{Est. Err.} & \textbf{95\% CrI}\\
+\midrule
+\endhead
+
+\endfoot
+\bottomrule
+\endlastfoot
+Intercept & 0.281 & (0.015) & {}[0.253, 0.310] & 0.282 & (0.014) & {}[0.254, 0.310] & 0.288 & (0.014) & {}[0.260, 0.316]\\
+Country (Ref. = England) &  &  &  &  &  &  &  &  & \\
+\hspace{1em}Wales & 0.033 & (0.042) & {}[$-$0.049, 0.116] & 0.014 & (0.032) & {}[$-$0.049, 0.077] & 0.016 & (0.032) & {}[$-$0.047, 0.079]\\
+\hspace{1em}Scotland & $-$0.045 & (0.034) & {}[$-$0.110, 0.021] & $-$0.045 & (0.033) & {}[$-$0.110, 0.020] & $-$0.113 & (0.025) & {}[$-$0.162, $-$0.064]\\
+\hspace{1em}Northern Ireland & 0.017 & (0.052) & {}[$-$0.086, 0.120] & 0.033 & (0.043) & {}[$-$0.051, 0.117] & 0.030 & (0.043) & {}[$-$0.053, 0.114]\\
+Female & $-$0.045 & (0.015) & {}[$-$0.075, $-$0.016] & $-$0.045 & (0.015) & {}[$-$0.074, $-$0.015] & $-$0.046 & (0.015) & {}[$-$0.076, $-$0.017]\\
+Age (Years logged) & $-$0.081 & (0.019) & {}[$-$0.118, $-$0.044] & $-$0.082 & (0.019) & {}[$-$0.119, $-$0.044] & $-$0.083 & (0.019) & {}[$-$0.120, $-$0.046]\\
+Education & 0.011 & (0.021) & {}[$-$0.029, 0.052] & 0.012 & (0.020) & {}[$-$0.028, 0.052] & 0.013 & (0.021) & {}[$-$0.028, 0.053]\\
+Power source frame (Ref. = power station) &  &  &  &  &  &  &  &  & \\
+\hspace{1em}Reactor frame & $-$0.026 & (0.014) & {}[$-$0.053, 0.001] & $-$0.026 & (0.014) & {}[$-$0.053, 0.000] & $-$0.026 & (0.014) & {}[$-$0.053, 0.001]\\
+Location frame (Ref. = United Kingdom) &  &  &  &  &  &  &  &  & \\
+\hspace{1em}Local frame & $-$0.030 & (0.015) & {}[$-$0.058, $-$0.001] & $-$0.031 & (0.014) & {}[$-$0.058, $-$0.003] & $-$0.042 & (0.014) & {}[$-$0.069, $-$0.016]\\
+Distance to nearest nuclear site (km logged) & 0.026 & (0.011) & {}[0.005, 0.047] & 0.026 & (0.011) & {}[0.005, 0.047] & 0.026 & (0.014) & {}[$-$0.002, 0.053]\\
+Follow news about electricity & 0.153 & (0.028) & {}[0.099, 0.207] & 0.153 & (0.027) & {}[0.099, 0.206] & 0.153 & (0.028) & {}[0.098, 0.208]\\
+UK needs to produce a lot more electricity & 0.280 & (0.038) & {}[0.207, 0.354] & 0.280 & (0.038) & {}[0.207, 0.354] & 0.277 & (0.038) & {}[0.203, 0.351]\\
+UK should be self-sufficient in electricity & $-$0.017 & (0.040) & {}[$-$0.096, 0.062] & $-$0.014 & (0.040) & {}[$-$0.092, 0.065] & $-$0.016 & (0.040) & {}[$-$0.094, 0.062]\\
+Critical to keep the price of electricity in the UK low & 0.023 & (0.036) & {}[$-$0.048, 0.095] & 0.022 & (0.036) & {}[$-$0.048, 0.094] & 0.026 & (0.037) & {}[$-$0.046, 0.099]\\
+Trust in government (factor score) & 0.060 & (0.055) & {}[$-$0.048, 0.168] & 0.061 & (0.055) & {}[$-$0.048, 0.170] & 0.061 & (0.055) & {}[$-$0.048, 0.170]\\
+Trust in electricity companies/suppliers (factor score) & 0.103 & (0.036) & {}[0.031, 0.173] & 0.103 & (0.036) & {}[0.033, 0.173] & 0.107 & (0.036) & {}[0.036, 0.178]\\
+Concern with climate change (factor score) & $-$0.147 & (0.056) & {}[$-$0.257, $-$0.038] & $-$0.148 & (0.056) & {}[$-$0.257, $-$0.037] & $-$0.148 & (0.057) & {}[$-$0.259, $-$0.037]\\
+Ideology (left--right) & 0.193 & (0.033) & {}[0.130, 0.257] & 0.194 & (0.033) & {}[0.130, 0.258] & 0.196 & (0.033) & {}[0.132, 0.261]\\
+Wales $\times$ Local frame & $-$0.039 & (0.058) & {}[$-$0.153, 0.075] &  &  &  &  &  & \\
+Scotland $\times$ Local frame & $-$0.141 & (0.046) & {}[$-$0.231, $-$0.051] & $-$0.141 & (0.046) & {}[$-$0.230, $-$0.052] &  &  & \\
+Northern Ireland $\times$ Local frame & 0.037 & (0.072) & {}[$-$0.102, 0.178] &  &  &  &  &  & \\
+Distance to nearest nuclear site $\times$ Local frame &  &  &  &  &  &  & 0.005 & (0.021) & {}[$-$0.036, 0.047]\\
+\midrule
+n & 1,276 &  &  & 1,276 &  &  & 1,276 &  & \\
+Bayes \textit{R}\textsuperscript{2} & 0.215 & (0.017) & {}[0.181, 0.248] & 0.214 & (0.017) & {}[0.181, 0.247] & 0.213 & (0.017) & {}[0.179, 0.246]\\
+ELPD & $-$73.997 & (42.061) &  & $-$71.807 & (42.083) &  & $-$77.076 & (41.981) & \\
+LOOIC & 147.993 & (84.123) &  & 143.615 & (84.166) &  & 154.152 & (83.963) & \\
+Sigma & 0.251 & (0.005) & {}[0.242, 0.261] & 0.251 & (0.005) & {}[0.242, 0.261] & 0.252 & (0.005) & {}[0.243, 0.262]\\
+RMSE & 0.251 & (0.001) &  & 0.251 & (0.001) &  & 0.250 & (0.001) & \\*
+\end{longtable}
+
+\vspace{-6pt}
+\begin{minipage}{\linewidth}
+\setlength{\parskip}{0pt}\scriptsize
+Models are linear models fit by Bayesian estimation in R (version 4.6.1) using brms (version 2.23.0) with the cmdstanr backend (Stan 2.40). Each model used 5 chains with 2,000 warmup and 10,000 post-warmup iterations per chain. Priors were weakly informative (normal) priors on all regression coefficients and default weakly informative priors on the model intercept [Student-t(3, 0.2, 2.5)] and the residual standard deviation (sigma) [Student-t(3, 0, 2.5)]. Estimates are posterior means with standard deviations in parentheses (Est. Error) and 95\% equal-tailed credible intervals in brackets. All Rhat values were $\leq$ 1.001 and all bulk and tail effective sample sizes exceeded 37,000 with no divergent transitions.
+\end{minipage}
+\end{landscape}

@@ -1,0 +1,66 @@
+\begin{landscape}
+\renewcommand{\thetable}{A\arabic{table}}
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.06}
+
+\begin{longtable}[t]{>{\raggedright\arraybackslash}p{2.8in}rrcrrcrrc}
+\caption{\label{tab:linear-models-wo-dks-addl}Results: Additional linear models, non-responses on dependent variable removed}\\
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{3}{c}{\textbf{Model 5a}} & \multicolumn{3}{c}{\textbf{Model 6a}} & \multicolumn{3}{c}{\textbf{Model 7a}} \\
+\cmidrule(l{3pt}r{3pt}){2-4} \cmidrule(l{3pt}r{3pt}){5-7} \cmidrule(l{3pt}r{3pt}){8-10}
+ & \textbf{Estimate} & \textbf{Est. Err.} & \textbf{95\% CrI} & \textbf{Estimate} & \textbf{Est. Err.} & \textbf{95\% CrI} & \textbf{Estimate} & \textbf{Est. Err.} & \textbf{95\% CrI}\\
+\midrule
+\endfirsthead
+\caption[]{Results: Additional linear models, non-responses on dependent variable removed}\\
+\toprule
+\multicolumn{1}{c}{ } & \multicolumn{3}{c}{\textbf{Model 5a}} & \multicolumn{3}{c}{\textbf{Model 6a}} & \multicolumn{3}{c}{\textbf{Model 7a}} \\
+\cmidrule(l{3pt}r{3pt}){2-4} \cmidrule(l{3pt}r{3pt}){5-7} \cmidrule(l{3pt}r{3pt}){8-10}
+ & \textbf{Estimate} & \textbf{Est. Err.} & \textbf{95\% CrI} & \textbf{Estimate} & \textbf{Est. Err.} & \textbf{95\% CrI} & \textbf{Estimate} & \textbf{Est. Err.} & \textbf{95\% CrI}\\
+\midrule
+\endhead
+
+\endfoot
+\bottomrule
+\endlastfoot
+Intercept & 0.293 & (0.015) & {}[0.264, 0.321] & 0.291 & (0.015) & {}[0.262, 0.321] & 0.293 & (0.015) & {}[0.264, 0.322]\\
+Country (Ref. = England) &  &  &  &  &  &  &  &  & \\
+\hspace{1em}Wales & 0.006 & (0.032) & {}[$-$0.057, 0.069] & 0.008 & (0.033) & {}[$-$0.056, 0.071] & 0.007 & (0.032) & {}[$-$0.056, 0.070]\\
+\hspace{1em}Scotland--Independence referendum: Yes & $-$0.271 & (0.038) & {}[$-$0.345, $-$0.197] &  &  &  &  &  & \\
+\hspace{1em}Scotland--Independence referendum: Not yes & $-$0.004 & (0.033) & {}[$-$0.068, 0.060] &  &  &  &  &  & \\
+\hspace{1em}Scotland--2024 vote: SNP &  &  &  & $-$0.257 & (0.045) & {}[$-$0.347, $-$0.168] &  &  & \\
+\hspace{1em}Scotland--2024 vote: Not SNP &  &  &  & $-$0.061 & (0.029) & {}[$-$0.119, $-$0.004] &  &  & \\
+\hspace{1em}Scotland--Party ID: SNP &  &  &  &  &  &  & $-$0.238 & (0.051) & {}[$-$0.337, $-$0.138]\\
+\hspace{1em}Scotland--Party ID: Not SNP &  &  &  &  &  &  & $-$0.082 & (0.028) & {}[$-$0.138, $-$0.027]\\
+\hspace{1em}Northern Ireland & 0.027 & (0.043) & {}[$-$0.058, 0.112] & 0.028 & (0.044) & {}[$-$0.057, 0.114] & 0.029 & (0.044) & {}[$-$0.057, 0.115]\\
+Female & $-$0.040 & (0.016) & {}[$-$0.070, $-$0.009] & $-$0.039 & (0.016) & {}[$-$0.070, $-$0.009] & $-$0.040 & (0.016) & {}[$-$0.071, $-$0.010]\\
+Age (Years logged) & $-$0.081 & (0.020) & {}[$-$0.119, $-$0.042] & $-$0.079 & (0.020) & {}[$-$0.118, $-$0.040] & $-$0.081 & (0.020) & {}[$-$0.120, $-$0.042]\\
+Education & 0.027 & (0.022) & {}[$-$0.015, 0.069] & 0.018 & (0.022) & {}[$-$0.024, 0.060] & 0.016 & (0.022) & {}[$-$0.026, 0.059]\\
+Power source frame (Ref. = power station) &  &  &  &  &  &  &  &  & \\
+\hspace{1em}Reactor frame & $-$0.026 & (0.014) & {}[$-$0.054, 0.002] & $-$0.024 & (0.014) & {}[$-$0.052, 0.004] & $-$0.024 & (0.014) & {}[$-$0.052, 0.003]\\
+Location frame (Ref. = United Kingdom) &  &  &  &  &  &  &  &  & \\
+\hspace{1em}Local frame & $-$0.040 & (0.014) & {}[$-$0.068, $-$0.013] & $-$0.042 & (0.014) & {}[$-$0.070, $-$0.014] & $-$0.044 & (0.014) & {}[$-$0.072, $-$0.016]\\
+Distance to nearest nuclear site (km logged) & 0.031 & (0.011) & {}[0.009, 0.054] & 0.030 & (0.011) & {}[0.008, 0.052] & 0.029 & (0.011) & {}[0.007, 0.051]\\
+Follow news about electricity & 0.153 & (0.029) & {}[0.096, 0.208] & 0.149 & (0.029) & {}[0.094, 0.205] & 0.152 & (0.029) & {}[0.096, 0.208]\\
+UK needs to produce a lot more electricity & 0.266 & (0.039) & {}[0.189, 0.343] & 0.278 & (0.040) & {}[0.201, 0.356] & 0.283 & (0.040) & {}[0.205, 0.362]\\
+UK should be self-sufficient in electricity & $-$0.008 & (0.042) & {}[$-$0.091, 0.075] & $-$0.022 & (0.042) & {}[$-$0.104, 0.061] & $-$0.023 & (0.042) & {}[$-$0.105, 0.060]\\
+Critical to keep the price of electricity in the UK low & 0.027 & (0.037) & {}[$-$0.047, 0.100] & 0.034 & (0.038) & {}[$-$0.040, 0.108] & 0.028 & (0.038) & {}[$-$0.046, 0.102]\\
+Trust in government (factor score) & 0.044 & (0.058) & {}[$-$0.068, 0.156] & 0.055 & (0.057) & {}[$-$0.057, 0.167] & 0.059 & (0.057) & {}[$-$0.053, 0.172]\\
+Trust in electricity companies/suppliers (factor score) & 0.102 & (0.037) & {}[0.029, 0.175] & 0.105 & (0.037) & {}[0.031, 0.178] & 0.107 & (0.038) & {}[0.033, 0.181]\\
+Concern with climate change (factor score) & $-$0.128 & (0.057) & {}[$-$0.240, $-$0.016] & $-$0.133 & (0.058) & {}[$-$0.246, $-$0.018] & $-$0.138 & (0.057) & {}[$-$0.250, $-$0.026]\\
+Ideology (left--right) & 0.184 & (0.034) & {}[0.118, 0.250] & 0.193 & (0.034) & {}[0.127, 0.259] & 0.195 & (0.034) & {}[0.129, 0.261]\\
+\midrule
+n & 1,220 &  &  & 1,220 &  &  & 1,220 &  & \\
+Bayes \textit{R}\textsuperscript{2} & 0.231 & (0.018) & {}[0.195, 0.266] & 0.222 & (0.018) & {}[0.186, 0.258] & 0.219 & (0.018) & {}[0.183, 0.255]\\
+ELPD & $-$76.977 & (41.804) &  & $-$84.797 & (41.790) &  & $-$88.121 & (41.392) & \\
+LOOIC & 153.955 & (83.608) &  & 169.595 & (83.581) &  & 176.242 & (82.784) & \\
+Sigma & 0.253 & (0.005) & {}[0.243, 0.263] & 0.254 & (0.005) & {}[0.244, 0.265] & 0.255 & (0.005) & {}[0.245, 0.266]\\
+RMSE & 0.248 & (0.001) &  & 0.250 & (0.001) &  & 0.250 & (0.001) & \\*
+\end{longtable}
+
+\vspace{-6pt}
+\begin{minipage}{\linewidth}
+\setlength{\parskip}{0pt}\scriptsize
+Models are linear models fit by Bayesian estimation in R (version 4.6.1) using brms (version 2.23.0) with the cmdstanr backend (Stan 2.40). Each model used 5 chains with 2,000 warmup and 10,000 post-warmup iterations per chain. Priors were weakly informative (normal) priors on all regression coefficients and default weakly informative priors on the model intercept [Student-t(3, 0.2, 2.5)] and the residual standard deviation (sigma) [Student-t(3, 0, 2.5)]. Estimates are posterior means with standard deviations in parentheses (Est. Error) and 95\% equal-tailed credible intervals in brackets. All Rhat values were $\leq$ 1.001 and all bulk and tail effective sample sizes exceeded 37,000 with no divergent transitions.
+\end{minipage}
+\end{landscape}
