@@ -22,10 +22,8 @@ library(scales)
 library(ggh4x)
 library(openxlsx)
 
-data.url <- "https://raw.githubusercontent.com/tgravelle/nuclear-energy-uk/refs/heads/main/UK_SMNR.csv"
+data.url <- "https://raw.githubusercontent.com/tgravelle/nuclear-energy-uk/refs/heads/main/data/UK_SMR.csv"
 data.0 <- read_csv(data.url)
-
-data.0a <- readRDS("C:/Users/timgr/OneDrive - Wilfrid Laurier University/Academic/UK Nuclear Energy/Data/UK_SMNR.rds")
 
 summary(data.0$weight)
 
@@ -103,7 +101,6 @@ data.1 <- data.0 %>%
     Country == "Northern Ireland" ~ 1,
     TRUE ~ 0
   )) %>%
-  mutate(Region = fct_relevel(REGION, "London")) %>%
   mutate(mii_col = case_when(
     MII == 9 ~ 1,
     TRUE ~ 0
@@ -135,7 +132,6 @@ data.1 <- data.0 %>%
     .x %in% 1:4 ~ .x,
     TRUE ~ NA_real_
   ))) %>%
-  mutate(vote_text = str_to_lower(VOTE_2024_TEXT)) %>%
   mutate(VOTE2024 = as_factor(case_when(
     VOTE_2024 == 2 ~ "Labour",
     VOTE_2024 == 1 ~ "Conservative",
@@ -147,13 +143,6 @@ data.1 <- data.0 %>%
     VOTE_2024 %in% c(8, 11, 12) ~ "Unionist",
     VOTE_2024 == 14 ~ "Other",
     VOTE_2024 %in% c(16, 17, 18, 19, 20) ~ "DNV",
-    str_detect(vote_text, "for labour") == TRUE ~ "Labour",
-    str_detect(vote_text, "voted labour") == TRUE ~ "Labour",
-    str_detect(vote_text, "independent") == TRUE ~ "Other",
-    str_detect(vote_text, "sdlp") == TRUE ~ "Nationalist",
-    str_detect(vote_text, "spoiled") == TRUE ~ "DNV",
-    str_detect(vote_text, "didn't") == TRUE ~ "DNV",
-    vote_text != "-99" ~ "Other",
     TRUE ~ "DNV"
   ))) %>%
   mutate(VOTE2024 = fct_relevel(VOTE2024, "Labour", "Conservative", "Liberal Democrat", "Reform UK",
@@ -195,7 +184,6 @@ xtabs(~ Country, addNA = TRUE, na.action = NULL, data = data.1)
 xtabs(~ Country, addNA = TRUE, na.action = NULL, data = data.1)
 xtabs(~ CountryWales, addNA = TRUE, na.action = NULL, data = data.1)
 xtabs(~ CountryNorthernIreland, addNA = TRUE, na.action = NULL, data = data.1)
-xtabs(~ Region, addNA = TRUE, na.action = NULL, data = data.1)
 
 xtabs(~ local_econ, addNA = TRUE, na.action = NULL, data = data.1)
 xtabs(~ local_envt, addNA = TRUE, na.action = NULL, data = data.1)
@@ -218,6 +206,7 @@ xtabs(~ trust_elec_supp, addNA = TRUE, na.action = NULL, data = data.1)
 xtabs(~ left_right, addNA = TRUE, na.action = NULL, data = data.1)
 xtabs(~ left_right, addNA = TRUE, na.action = NULL, data = data.1)
 xtabs(~ VOTE2024, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ VOTE2024, addNA = TRUE, na.action = NULL, data = data.1, subset = Country == "Scotland")
 xtabs(~ Scotland_Ind_Ref, addNA = TRUE, na.action = NULL, data = data.1)
 xtabs(~ Scotland_Vote_2024, addNA = TRUE, na.action = NULL, data = data.1)
 xtabs(~ Scotland_PID, addNA = TRUE, na.action = NULL, data = data.1)
@@ -226,7 +215,6 @@ data.1 %>% group_by(SEX) %>% summarise(mean_weight = mean(weight))
 data.1 %>% group_by(AGE) %>% summarise(mean_weight = mean(weight))
 data.1 %>% group_by(EDU) %>% summarise(mean_weight = mean(weight))
 data.1 %>% group_by(Country) %>% summarise(mean_weight = mean(weight))
-data.1 %>% group_by(REGION) %>% summarise(mean_weight = mean(weight))
 data.1 %>% group_by(VOTE2024) %>% summarise(mean_weight = mean(weight))
 data.1 %>% filter(Country == "Scotland") %>% group_by(VOTE2024) %>% summarise(mean_weight = mean(weight))
 
@@ -353,8 +341,6 @@ range_dist <- max(data.2$ln_nuclear_dist_km) - min(data.2$ln_nuclear_dist_km)
 priors <- c(set_prior(sprintf("normal(%f, %f)", mean_y, sd_y), class = "Intercept"),
             set_prior(sprintf("normal(0, %f)", 0.5 * sd_y), class = "b"),
             set_prior(sprintf("exponential(%f)", 1 / sd_y), class = "sigma"),
-            #set_prior(sprintf("normal(0, %f)", (0.5 * sd_y) / 1.564), class = "b", coef = "ln_age_years"),
-            #set_prior(sprintf("normal(0, %f)", (0.5 * sd_y) / 5.612), class = "b", coef = "ln_nuclear_dist_km"),
             set_prior("normal(-0.0625, 0.05)", class = "b", coef = "RPSReactor"),
             set_prior("normal(-0.0625, 0.05)", class = "b", coef = "LOCLocal"))
 
@@ -941,7 +927,7 @@ model.out(m4.nr)
 model.out(m5.nr)
 model.out(m6.nr)
 model.out(m7.nr)
-saveWorkbook(work_book, "./appendix/Bayesian models-nuclear energy-2026 10 28.xlsx", overwrite = TRUE)
+saveWorkbook(work_book, "./appendix/Bayesian models-nuclear energy-2026 10 29.xlsx", overwrite = TRUE)
 
 summ_m3 <- summ_m3 %>% mutate(term = case_when(term == "Scotland_Local" ~ "CountryScotland:LOCLocal", TRUE ~ term))
 summ_m3.nr <- summ_m3.nr %>% mutate(term = case_when(term == "Scotland_Local" ~ "CountryScotland:LOCLocal", TRUE ~ term))
@@ -1455,7 +1441,7 @@ fig.0 <- ggplot(data = pred.means, aes(x = RPS, y = Estimate, fill = RPS)) +
   scale_fill_manual(values = c("Power Station" = "grey84", "Reactor" = "grey30")) +
   geom_errorbar(aes(ymin = LCL+0.5, ymax = UCL+0.5),
                 position = position_dodge(0.75), width = 0.3, colour = "black", linewidth = 0.4) +
-  labs(y = "Support for modular nuclear",
+  labs(y = "Support for SMRs",
        x = "") +
   coord_cartesian(ylim = c(0, 1)) +
   scale_y_continuous(breaks = seq(0, 1, by = 0.25), expand = c(0,0),
@@ -1472,8 +1458,8 @@ fig.0 <- ggplot(data = pred.means, aes(x = RPS, y = Estimate, fill = RPS)) +
 
 fig.0
 
-ggsave(plot = fig.0, file = "./manuscript/Fig 0-Means by condition 2026 10 26.png",
-       device = "png",  width = 6.5, height = 3, units = "in", dpi = 1200)
+#ggsave(plot = fig.0, file = "./manuscript/Fig 0-Means by condition.png",
+#       device = "png",  width = 6.5, height = 3, units = "in", dpi = 600)
 
 ## Fig. 2: Coefficient plot
 coef.ci.m1 <- m1 %>%
@@ -1649,8 +1635,8 @@ fig.2 <- ggplot(data = coef.ci.support, aes(x = estimate, y = coef.label, colour
 
 fig.2
 
-ggsave(plot = fig.2, file = "./manuscript/Fig 2-Coefficient plot-2026 10 26.png",
-       device = "png",  width = 6, height = 8.25, units = "in", dpi = 1200)
+ggsave(plot = fig.2, file = "./manuscript/Fig 2-Coefficient plot.png",
+       device = "png",  width = 6, height = 8.25, units = "in", dpi = 600)
 
 coef.ci.support.exp.dist <- coef.ci.support %>%
   filter(coef.label %in% c("Intercept",
@@ -1686,8 +1672,8 @@ fig.2a <- ggplot(data = coef.ci.support.exp.dist, aes(x = estimate, y = coef.lab
 
 fig.2a
 
-ggsave(plot = fig.2a, file = "./manuscript/Fig 2a-Coefficient plot-2026 10 26.png",
-       device = "png",  width = 6, height = 6, units = "in", dpi = 1200)
+#ggsave(plot = fig.2a, file = "./manuscript/Fig 2a-Coefficient plot.png",
+#       device = "png",  width = 6, height = 6, units = "in", dpi = 600)
 
 ## Fig. 3: Effect of power station/reactor frames
 score_reactor <- c("England", "Scotland", "Wales", "Northern Ireland") %>%
@@ -1726,7 +1712,7 @@ fig.3 <- ggplot(data = pred.country.reactor, aes(x = RPS, y = Estimate, fill = R
   scale_fill_manual(values = c("Power Station" = "grey84", "Reactor" = "grey30")) +
   geom_errorbar(aes(ymin = LCL+0.5, ymax = UCL+0.5),
                 position = position_dodge(0.75), width = 0.3, colour = "black", linewidth = 0.4) +
-  labs(y = "Support for modular nuclear",
+  labs(y = "Support for SMRs",
        x = "") +
   coord_cartesian(ylim = c(0, 1)) +
   scale_y_continuous(breaks = seq(0, 1, by = 0.25), expand = c(0,0),
@@ -1743,8 +1729,8 @@ fig.3 <- ggplot(data = pred.country.reactor, aes(x = RPS, y = Estimate, fill = R
 
 fig.3
 
-ggsave(plot = fig.3, file = "./manuscript/Fig 3-Effect plot-Country x reactor 2026 10 26.png",
-       device = "png",  width = 6.5, height = 6, units = "in", dpi = 1200)
+ggsave(plot = fig.3, file = "./manuscript/Fig 3-Effect plot-Country x reactor.png",
+       device = "png",  width = 6.5, height = 6, units = "in", dpi = 600)
 
 ## Fig. 4: Effect of UK/local frames
 score_uk_local <- c("England", "Scotland", "Wales", "Northern Ireland") %>%
@@ -1789,7 +1775,7 @@ fig.4 <- ggplot(data = pred.country.local, aes(x = LOC, y = Estimate, fill = LOC
   geom_bar(aes(y = Estimate+0.5), stat = "identity", width = 0.6, position = position_dodge(0.75)) +
   scale_fill_manual(values = c("UK" = "grey84", "Local area" = "grey30")) +
   geom_errorbar(aes(ymin = LCL+0.5, ymax = UCL+0.5), position = position_dodge(0.75), width = 0.3, colour = "black", linewidth = 0.4) +
-  labs(y = "Support for modular nuclear",
+  labs(y = "Support for SMRs",
        x = "") +
   coord_cartesian(ylim = c(0, 1)) +
   scale_y_continuous(breaks = seq(0, 1, by = 0.25), expand = c(0,0),
@@ -1806,8 +1792,8 @@ fig.4 <- ggplot(data = pred.country.local, aes(x = LOC, y = Estimate, fill = LOC
 
 fig.4
 
-ggsave(plot = fig.4, file = "./manuscript/Fig 4-Effect plot-Country x local 2026 10 26.png",
-       device = "png",  width = 6.5, height = 6, units = "in", dpi = 1200)
+ggsave(plot = fig.4, file = "./manuscript/Fig 4-Effect plot-Country x local.png",
+       device = "png",  width = 6.5, height = 6, units = "in", dpi = 600)
 
 ## Fig. 5: Effect of distance to nuclear site (m3)
 score_dist <- as_tibble(seq(from = 0.1, to = 20, by = 0.1)) %>%
@@ -1873,7 +1859,7 @@ fig.5 <- ggplot(data = pred.country.dist.uk.local, aes(y = Estimate+0.5, x = nuc
   geom_line(aes(y = Estimate+0.5), linewidth = 0.5) +
   geom_ribbon(aes(ymin = LCL+0.5, ymax = UCL+0.5), alpha = 0.1) +
   geom_rug(data = data.rug, aes(x = nuclear_dist_km), sides = "b", alpha = 0.4, linewidth = 0.4, inherit.aes = FALSE) +
-  labs(y = "Support for modular nuclear",
+  labs(y = "Support for SMRs",
        x = "Distance to nuclear site") +
   coord_cartesian(xlim = c(4.5, 500), ylim = c(0, 1)) +
   scale_x_continuous(trans = "log", breaks = c(5, 10, 20, 50, 100, 200, 500), labels = label_number()) +
@@ -1899,36 +1885,5 @@ fig.5 <- ggplot(data = pred.country.dist.uk.local, aes(y = Estimate+0.5, x = nuc
   
 fig.5
   
-ggsave(plot = fig.5, file = "./manuscript/Fig 5-Effect plot-Country frame dist 2026 10 26.png",
-       device = "png",  width = 6.5, height = 3, units = "in", dpi = 1200)
-
-fig.5a <- ggplot(data = pred.country.dist.uk.local, aes(y = Estimate+0.5, x = nuclear_dist_km, linetype = UK_Local)) +
-  geom_line(aes(y = Estimate+0.5), linewidth = 0.5) +
-  geom_ribbon(aes(ymin = LCL+0.5, ymax = UCL+0.5), alpha = 0.1) +
-  geom_rug(data = data.rug, aes(x = nuclear_dist_km), sides = "b", alpha = 0.4, linewidth = 0.4, inherit.aes = FALSE) +
-  labs(y = "Support for modular nuclear",
-       x = "Distance to nuclear site") +
-  coord_cartesian(xlim = c(4.5, 500), ylim = c(0, 1)) +
-  scale_x_continuous(trans = "log", breaks = c(5, 10, 20, 50, 100, 200, 500), labels = label_number()) +
-  scale_linetype_manual(values = c("UK" = "solid", "Local area" = "dashed")) + 
-  scale_y_continuous(breaks = seq(0, 1, by = 0.25), expand = c(0,0),
-                     labels = c("Strongly\noppose", "", "", "", "Strongly\nsupport")) +
-  facet_wrap(~ Country_UK_Local, ncol = 2, axes = "all", scales = "fixed") +
-  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-        panel.background = element_blank(),
-        panel.spacing = unit(1.5, "lines"),
-        axis.text = element_text(size = 9, colour = "black"),
-        axis.line = element_line(colour = "black"),
-        axis.ticks = element_line(colour = "black"),
-        axis.title.y = element_text(margin = margin(t = 0, r = 25, b = 0, l = 10), color = "black"),
-        axis.title.x = element_text(margin = margin(t = 10, r = 0, b = 0, l = 0)),
-        strip.text.x = element_text(size = 10, colour = "black"),
-        axis.line.x.top = element_line(color = "black"),
-        axis.ticks.x.top = element_line(color = "black"),
-        axis.text.x.top = element_text(color = "black"),
-        legend.position = "none")
-
-fig.5a
-
-#ggsave(plot = fig.5a, file = "./manuscript/Fig 5a-Effect plot-Country frame dist 2026 10 26.png",
-#       device = "png", width = 6.5, height = 6, units = "in", dpi = 1200)
+ggsave(plot = fig.5, file = "./manuscript/Fig 5-Effect plot-Country frame dist.png",
+       device = "png",  width = 6.5, height = 3, units = "in", dpi = 600)
