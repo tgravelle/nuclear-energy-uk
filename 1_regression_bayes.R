@@ -21,6 +21,7 @@ library(DescTools)
 library(scales)
 library(ggh4x)
 library(openxlsx)
+library(kableExtra)
 
 data.url <- "https://raw.githubusercontent.com/tgravelle/nuclear-energy-uk/refs/heads/main/data/UK_SMR.csv"
 data.0 <- read_csv(data.url)
@@ -327,10 +328,10 @@ summary(data.2$climate)
 summary(data.2$left_right)
 summary(data.2$ln_nuclear_dist_km)
 
-data.2.nr <- data.2 %>%
+data.2a <- data.2 %>%
   filter_out(support_smr_nr == -9)
 
-summary(data.2.nr$support_smr)
+summary(data.2a$support_smr)
 
 ## Regression models
 mean_y <- weighted.mean(x = data.2$support_smr, weights = data.2$weight, na.rm = TRUE)
@@ -580,10 +581,10 @@ mean(posterior_m7$b_Scotland_PIDScotlandMSNP < 0)
 
 
 ## Regression models with item non-response on DV dropped
-mean_y <- weighted.mean(x = data.2.nr$support_smr, weights = data.2.nr$weight, na.rm = TRUE)
-sd_y <- sqrt(Hmisc::wtd.var(data.2.nr$support_smr, weights = data.2.nr$weight, na.rm = TRUE))
-range_age <- max(data.2.nr$ln_age_years) - min(data.2.nr$ln_age_years)
-range_dist <- max(data.2.nr$ln_nuclear_dist_km) - min(data.2.nr$ln_nuclear_dist_km)
+mean_y <- weighted.mean(x = data.2a$support_smr, weights = data.2a$weight, na.rm = TRUE)
+sd_y <- sqrt(Hmisc::wtd.var(data.2a$support_smr, weights = data.2a$weight, na.rm = TRUE))
+range_age <- max(data.2a$ln_age_years) - min(data.2a$ln_age_years)
+range_dist <- max(data.2a$ln_nuclear_dist_km) - min(data.2a$ln_nuclear_dist_km)
 
 priors <- c(set_prior(sprintf("normal(%f, %f)", mean_y, sd_y), class = "Intercept"),
             set_prior(sprintf("normal(0, %f)", 0.5 * sd_y), class = "b"),
@@ -593,8 +594,8 @@ priors <- c(set_prior(sprintf("normal(%f, %f)", mean_y, sd_y), class = "Intercep
             set_prior("normal(-0.0625, 0.05)", class = "b", coef = "RPSReactor"),
             set_prior("normal(-0.0625, 0.05)", class = "b", coef = "LOCLocal"))
 
-m00.nr <- brm(formula = support_smr | weights(weight) ~ RPS + LOC + RPS*LOC,
-                 data = data.2.nr,
+m00a <- brm(formula = support_smr | weights(weight) ~ RPS + LOC + RPS*LOC,
+                 data = data.2a,
                  family = gaussian,
                  prior = priors,
                  backend = "cmdstanr",
@@ -606,9 +607,9 @@ m00.nr <- brm(formula = support_smr | weights(weight) ~ RPS + LOC + RPS*LOC,
                  refresh = 1000,
                  seed = 20261008,
                  save_pars = save_pars(all = TRUE))
-print(m00.nr, digits = 3)
-prior_summary(m00.nr)
-m00.nr <- add_criterion(m00.nr, "loo")
+print(m00a, digits = 3)
+prior_summary(m00a)
+m00a <- add_criterion(m00a, "loo")
 
 priors <- c(set_prior(sprintf("normal(%f, %f)", mean_y, sd_y), class = "Intercept"),
             set_prior(sprintf("normal(0, %f)", 0.5 * sd_y), class = "b"),
@@ -618,9 +619,9 @@ priors <- c(set_prior(sprintf("normal(%f, %f)", mean_y, sd_y), class = "Intercep
             set_prior("normal(-0.0625, 0.05)", class = "b", coef = "RPSReactor"),
             set_prior("normal(-0.0625, 0.05)", class = "b", coef = "LOCLocal"))
 
-m0.nr <- brm(formula = support_smr | weights(weight) ~ Country + Female + ln_age_years + Educ
+m0a <- brm(formula = support_smr | weights(weight) ~ Country + Female + ln_age_years + Educ
              + RPS + LOC + ln_nuclear_dist_km,
-             data = data.2.nr,
+             data = data.2a,
              family = gaussian,
              prior = priors,
              backend = "cmdstanr",
@@ -632,14 +633,14 @@ m0.nr <- brm(formula = support_smr | weights(weight) ~ Country + Female + ln_age
              refresh = 1000,
              seed = 20261008,
              save_pars = save_pars(all = TRUE))
-print(m0.nr, digits = 3)
-prior_summary(m0.nr)
-m0.nr <- add_criterion(m0.nr, "loo")
+print(m0a, digits = 3)
+prior_summary(m0a)
+m0a <- add_criterion(m0a, "loo")
 
-m1.nr <- brm(formula = support_smr | weights(weight) ~ Country + Female + ln_age_years + Educ
+m1a <- brm(formula = support_smr | weights(weight) ~ Country + Female + ln_age_years + Educ
              + RPS + LOC + ln_nuclear_dist_km
              + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right,
-             data = data.2.nr,
+             data = data.2a,
              family = gaussian,
              prior = priors,
              backend = "cmdstanr",
@@ -651,21 +652,21 @@ m1.nr <- brm(formula = support_smr | weights(weight) ~ Country + Female + ln_age
              refresh = 1000,
              seed = 20261008,
              save_pars = save_pars(all = TRUE))
-print(m1.nr, digits = 3)
-prior_summary(m1.nr)
-m1.nr <- add_criterion(m1.nr, "loo")
-posterior_m1.nr <- as_draws_df(m1.nr)
+print(m1a, digits = 3)
+prior_summary(m1a)
+m1a <- add_criterion(m1a, "loo")
+posterior_m1a <- as_draws_df(m1a)
 
-mean(posterior_m1.nr$b_RPSReactor >= 0)
-mean(posterior_m1.nr$b_RPSReactor < 0)
-mean(posterior_m1.nr$b_LOCLocal >= 0)
-mean(posterior_m1.nr$b_LOCLocal < 0)
+mean(posterior_m1a$b_RPSReactor >= 0)
+mean(posterior_m1a$b_RPSReactor < 0)
+mean(posterior_m1a$b_LOCLocal >= 0)
+mean(posterior_m1a$b_LOCLocal < 0)
 
-m2.nr <- brm(formula = support_smr | weights(weight) ~ Country + Female + ln_age_years + Educ
+m2a <- brm(formula = support_smr | weights(weight) ~ Country + Female + ln_age_years + Educ
              + RPS + LOC + ln_nuclear_dist_km
              + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right
              + LOC*Country,
-             data = data.2.nr,
+             data = data.2a,
              family = gaussian,
              prior = priors,
              backend = "cmdstanr",
@@ -677,19 +678,19 @@ m2.nr <- brm(formula = support_smr | weights(weight) ~ Country + Female + ln_age
              refresh = 1000,
              seed = 20261008,
              save_pars = save_pars(all = TRUE))
-print(m2.nr, digits = 3)
-prior_summary(m2.nr)
-m2.nr <- add_criterion(m2.nr, "loo")
-bayes_factor(m2.nr, m1.nr)   # Estimated Bayes factor in favor of m2.nr over m1.nr: 9.53820
-loo_compare(m1.nr, m2.nr)
-posterior_m2.nr <- as_draws_df(m2.nr)
-mean(posterior_m2.nr$b_LOCLocal < 0)
+print(m2a, digits = 3)
+prior_summary(m2a)
+m2a <- add_criterion(m2a, "loo")
+bayes_factor(m2a, m1a)   # Estimated Bayes factor in favor of m2a over m1a: 9.53820
+loo_compare(m1a, m2a)
+posterior_m2a <- as_draws_df(m2a)
+mean(posterior_m2a$b_LOCLocal < 0)
 
-m3.nr <- brm(formula = support_smr | weights(weight) ~ Country + Female + ln_age_years + Educ
+m3a <- brm(formula = support_smr | weights(weight) ~ Country + Female + ln_age_years + Educ
              + RPS + LOC + ln_nuclear_dist_km
              + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right
              + Scotland_Local,
-             data = data.2.nr,
+             data = data.2a,
              family = gaussian,
              prior = priors,
              backend = "cmdstanr",
@@ -701,42 +702,42 @@ m3.nr <- brm(formula = support_smr | weights(weight) ~ Country + Female + ln_age
              refresh = 1000,
              seed = 20261008,
              save_pars = save_pars(all = TRUE))
-print(m3.nr, digits = 3)
-prior_summary(m3.nr)
-m3.nr <- add_criterion(m3.nr, "loo")
-bayes_factor(m3.nr, m1.nr)   # Estimated Bayes factor in favor of m3.nr over m1.nr: 30.339
-loo_compare(m1.nr, m3.nr)
-posterior_m3.nr <- as_draws_df(m3.nr)
-posterior_m3.nr$b_LOCLocal_plus_Scotland_Local <- posterior_m3.nr$b_LOCLocal + posterior_m3.nr$b_Scotland_Local
+print(m3a, digits = 3)
+prior_summary(m3a)
+m3a <- add_criterion(m3a, "loo")
+bayes_factor(m3a, m1a)   # Estimated Bayes factor in favor of m3a over m1a: 30.339
+loo_compare(m1a, m3a)
+posterior_m3a <- as_draws_df(m3a)
+posterior_m3a$b_LOCLocal_plus_Scotland_Local <- posterior_m3a$b_LOCLocal + posterior_m3a$b_Scotland_Local
 
-mean(posterior_m3.nr$b_RPSReactor >= 0)
-mean(posterior_m3.nr$b_RPSReactor < 0)
+mean(posterior_m3a$b_RPSReactor >= 0)
+mean(posterior_m3a$b_RPSReactor < 0)
 
-hypothesis(m3.nr, "RPSReactor > 0")
-mcmc_areas(posterior_m3.nr, pars = "b_RPSReactor", prob = 0.95)
+hypothesis(m3a, "RPSReactor > 0")
+mcmc_areas(posterior_m3a, pars = "b_RPSReactor", prob = 0.95)
 
-mean(posterior_m3.nr$b_LOCLocal >= 0)
-mean(posterior_m3.nr$b_LOCLocal < 0)
-hypothesis(m3.nr, "LOCLocal < 0")
-mcmc_areas(posterior_m3.nr, pars = "b_LOCLocal", prob = 0.95)
+mean(posterior_m3a$b_LOCLocal >= 0)
+mean(posterior_m3a$b_LOCLocal < 0)
+hypothesis(m3a, "LOCLocal < 0")
+mcmc_areas(posterior_m3a, pars = "b_LOCLocal", prob = 0.95)
 
-mean(posterior_m3.nr$b_Scotland_Local >= 0)
-mean(posterior_m3.nr$b_Scotland_Local < 0)
-mean(posterior_m3.nr$b_LOCLocal + posterior_m3.nr$b_Scotland_Local < 0)
-hypothesis(m3.nr, "Scotland_Local < 0")
-mcmc_areas(posterior_m3.nr, pars = "b_Scotland_Local", prob = 0.95)
-mcmc_areas(posterior_m3.nr, pars = "b_LOCLocal_plus_Scotland_Local", prob = 0.95)
+mean(posterior_m3a$b_Scotland_Local >= 0)
+mean(posterior_m3a$b_Scotland_Local < 0)
+mean(posterior_m3a$b_LOCLocal + posterior_m3a$b_Scotland_Local < 0)
+hypothesis(m3a, "Scotland_Local < 0")
+mcmc_areas(posterior_m3a, pars = "b_Scotland_Local", prob = 0.95)
+mcmc_areas(posterior_m3a, pars = "b_LOCLocal_plus_Scotland_Local", prob = 0.95)
 
-mean(posterior_m3.nr$b_ln_nuclear_dist_km <= 0)
-mean(posterior_m3.nr$b_ln_nuclear_dist_km > 0)
-hypothesis(m3.nr, "ln_nuclear_dist_km > 0")
-mcmc_areas(posterior_m3.nr, pars = "b_ln_nuclear_dist_km", prob = 0.95)
+mean(posterior_m3a$b_ln_nuclear_dist_km <= 0)
+mean(posterior_m3a$b_ln_nuclear_dist_km > 0)
+hypothesis(m3a, "ln_nuclear_dist_km > 0")
+mcmc_areas(posterior_m3a, pars = "b_ln_nuclear_dist_km", prob = 0.95)
 
-m4.nr <- brm(formula = support_smr | weights(weight) ~ Country + Female + ln_age_years + Educ
+m4a <- brm(formula = support_smr | weights(weight) ~ Country + Female + ln_age_years + Educ
              + RPS + LOC + ln_nuclear_dist_km
              + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right
              + LOC*ln_nuclear_dist_km,
-             data = data.2.nr,
+             data = data.2a,
              family = gaussian,
              prior = priors,
              backend = "cmdstanr",
@@ -748,18 +749,18 @@ m4.nr <- brm(formula = support_smr | weights(weight) ~ Country + Female + ln_age
              refresh = 1000,
              seed = 20261008,
              save_pars = save_pars(all = TRUE))
-print(m4.nr, digits = 3)
-prior_summary(m4.nr)
-m4.nr <- add_criterion(m4.nr, "loo")
-bayes_factor(m4.nr, m1.nr)   # Estimated Bayes factor in favor of m4.nr over m1.nr: 0.157
-loo_compare(m1.nr, m4.nr)
-posterior_m4.nr <- as_draws_df(m4.nr)
+print(m4a, digits = 3)
+prior_summary(m4a)
+m4a <- add_criterion(m4a, "loo")
+bayes_factor(m4a, m1a)   # Estimated Bayes factor in favor of m4a over m1a: 0.157
+loo_compare(m1a, m4a)
+posterior_m4a <- as_draws_df(m4a)
 
-m5.nr <- brm(formula = support_smr | weights(weight) ~ CountryWales + CountryNorthernIreland + Female + ln_age_years + Educ
+m5a <- brm(formula = support_smr | weights(weight) ~ CountryWales + CountryNorthernIreland + Female + ln_age_years + Educ
              + RPS + LOC + ln_nuclear_dist_km
              + Scotland_Ind_Ref
              + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right,
-             data = data.2.nr,
+             data = data.2a,
              family = gaussian,
              prior = priors,
              backend = "cmdstanr",
@@ -771,19 +772,19 @@ m5.nr <- brm(formula = support_smr | weights(weight) ~ CountryWales + CountryNor
              refresh = 1000,
              seed = 20261008,
              save_pars = save_pars(all = TRUE))
-print(m5.nr, digits = 3)
-prior_summary(m5.nr)
-m5.nr <- add_criterion(m5.nr, "loo")
-bayes_factor(m5.nr, m1.nr)   # Estimated Bayes factor in favor of m5.nr over m1.nr: 748704.383
-loo_compare(m1.nr, m5.nr)
-posterior_m5.nr <- as_draws_df(m5.nr)
-mean(posterior_m5.nr$b_Scotland_Ind_RefYes < 0)
+print(m5a, digits = 3)
+prior_summary(m5a)
+m5a <- add_criterion(m5a, "loo")
+bayes_factor(m5a, m1a)   # Estimated Bayes factor in favor of m5a over m1a: 748704.383
+loo_compare(m1a, m5a)
+posterior_m5a <- as_draws_df(m5a)
+mean(posterior_m5a$b_Scotland_Ind_RefYes < 0)
 
-m6.nr <- brm(formula = support_smr | weights(weight) ~ CountryWales + CountryNorthernIreland + Female + ln_age_years + Educ
+m6a <- brm(formula = support_smr | weights(weight) ~ CountryWales + CountryNorthernIreland + Female + ln_age_years + Educ
              + RPS + LOC + ln_nuclear_dist_km
              + Scotland_Vote_2024
              + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right,
-             data = data.2.nr,
+             data = data.2a,
              family = gaussian,
              prior = priors,
              backend = "cmdstanr",
@@ -795,19 +796,19 @@ m6.nr <- brm(formula = support_smr | weights(weight) ~ CountryWales + CountryNor
              refresh = 1000,
              seed = 20261008,
              save_pars = save_pars(all = TRUE))
-print(m6.nr, digits = 3)
-prior_summary(m6.nr)
-m6.nr <- add_criterion(m6.nr, "loo")
-bayes_factor(m6.nr, m1.nr)   # Estimated Bayes factor in favor of m6.nr over m1.nr: 250.056
-loo_compare(m1.nr, m6.nr)
-posterior_m6.nr <- as_draws_df(m6.nr)
-mean(posterior_m6.nr$b_Scotland_Vote_2024ScotlandMSNP < 0)
+print(m6a, digits = 3)
+prior_summary(m6a)
+m6a <- add_criterion(m6a, "loo")
+bayes_factor(m6a, m1a)   # Estimated Bayes factor in favor of m6a over m1a: 250.056
+loo_compare(m1a, m6a)
+posterior_m6a <- as_draws_df(m6a)
+mean(posterior_m6a$b_Scotland_Vote_2024ScotlandMSNP < 0)
 
-m7.nr <- brm(formula = support_smr | weights(weight) ~ CountryWales + CountryNorthernIreland + Female + ln_age_years + Educ
+m7a <- brm(formula = support_smr | weights(weight) ~ CountryWales + CountryNorthernIreland + Female + ln_age_years + Educ
              + RPS + LOC + ln_nuclear_dist_km
              + Scotland_PID
              + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right,
-             data = data.2.nr,
+             data = data.2a,
              family = gaussian,
              prior = priors,
              backend = "cmdstanr",
@@ -819,16 +820,81 @@ m7.nr <- brm(formula = support_smr | weights(weight) ~ CountryWales + CountryNor
              refresh = 1000,
              seed = 20261008,
              save_pars = save_pars(all = TRUE))
-print(m7.nr, digits = 3)
-prior_summary(m7.nr)
-m7.nr <- add_criterion(m7.nr, "loo")
-bayes_factor(m7.nr, m1.nr)   # Estimated Bayes factor in favor of m7.nr over m1.nr: 11.30639
-loo_compare(m1.nr, m7.nr)
-posterior_m7.nr <- as_draws_df(m7.nr)
-mean(posterior_m7.nr$b_Scotland_PIDScotlandMSNP < 0)
+print(m7a, digits = 3)
+prior_summary(m7a)
+m7a <- add_criterion(m7a, "loo")
+bayes_factor(m7a, m1a)   # Estimated Bayes factor in favor of m7a over m1a: 11.30639
+loo_compare(m1a, m7a)
+posterior_m7a <- as_draws_df(m7a)
+mean(posterior_m7a$b_Scotland_PIDScotlandMSNP < 0)
 
-#save(m00, m0, m1, m2, m3, m4, m5, m6, m7,
-#     m00.nr, m0.nr, m1.nr, m2.nr, m3.nr, m4.nr, m5.nr, m6.nr, m7.nr, file = "./uk_smr_models.rda")
+
+## Frequentist models for comparison
+m00b <- lm(support_smr ~ RPS + LOC + RPS*LOC, data = data.2, weights = weight)
+tidy(m00b)
+
+m0b <- lm(support_smr ~ Country + Female + ln_age_years + Educ
+          + RPS + LOC + ln_nuclear_dist_km,
+          data = data.2, weights = weight)
+tidy(m0b)
+
+m1b <- lm(support_smr ~ Country + Female + ln_age_years + Educ
+          + RPS + LOC + ln_nuclear_dist_km
+          + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right,
+          data = data.2, weights = weight)
+tidy(m1b)
+
+m2b <- lm(support_smr ~ Country + Female + ln_age_years + Educ
+          + RPS + LOC + ln_nuclear_dist_km
+          + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right
+          + LOC*Country,
+          data = data.2, weights = weight)
+print(tidy(m2b), n = 50)
+anova(m1b, m2b, test = "F")
+
+m3b <- lm(support_smr ~ Country + Female + ln_age_years + Educ
+          + RPS + LOC + ln_nuclear_dist_km
+          + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right
+          + Scotland_Local,
+          data = data.2, weights = weight)
+print(tidy(m3b), n = 50)
+anova(m1b, m3b, test = "F")
+
+m4b <- lm(support_smr ~ Country + Female + ln_age_years + Educ
+          + RPS + LOC + ln_nuclear_dist_km
+          + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right
+          + LOC*ln_nuclear_dist_km,
+          data = data.2, weights = weight)
+print(tidy(m4b), n = 50)
+anova(m1b, m4b, test = "F")
+
+m5b <- lm(support_smr ~ CountryWales + CountryNorthernIreland + Female + ln_age_years + Educ
+          + RPS + LOC + ln_nuclear_dist_km
+          + Scotland_Ind_Ref
+          + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right,
+          data = data.2, weights = weight)
+print(tidy(m5b), n = 50)
+anova(m1b, m5b, test = "F")
+
+m6b <- lm(support_smr ~ CountryWales + CountryNorthernIreland + Female + ln_age_years + Educ
+          + RPS + LOC + ln_nuclear_dist_km
+          + Scotland_Vote_2024
+          + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right,
+          data = data.2, weights = weight)
+print(tidy(m6b), n = 50)
+anova(m1b, m6b, test = "F")
+
+m7b <- lm(support_smr ~ CountryWales + CountryNorthernIreland + Female + ln_age_years + Educ
+          + RPS + LOC + ln_nuclear_dist_km
+          + Scotland_PID
+          + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right,
+          data = data.2, weights = weight)
+print(tidy(m7b), n = 50)
+anova(m1b, m7b, test = "F")
+
+save(m00, m0, m1, m2, m3, m4, m5, m6, m7,
+     m00a, m0a, m1a, m2a, m3a, m4a, m5a, m6a, m7a,
+     m00b, m0b, m1b, m2b, m3b, m4b, m5b, m6b, m7b, file = "./uk_smr_models.rda")
 
 
 ## Model summaries; save out results to Excel and create LaTeX tables
@@ -845,7 +911,7 @@ bayes_rmse <- function(fit) {
   )
 }
 
-model.out <- function(model_obj){
+model.out.bayes <- function(model_obj){
   old_opts <- options(warn = -1)
   on.exit(options(old_opts), add = TRUE)
   model_name <- deparse(substitute(model_obj))
@@ -907,30 +973,85 @@ model.out <- function(model_obj){
   openxlsx::writeData(work_book, model_name, model_out)
 }
 
+model.out.freq <- function(model_obj){
+  old_opts <- options(warn = -1)
+  on.exit(options(old_opts), add = TRUE)
+  model_name <- deparse(substitute(model_obj))
+  model_out <- broom::tidy(model_obj) %>%
+    mutate(Conf.low = estimate - (std.error * (qnorm(0.975)))) %>%
+    mutate(Conf.high = estimate + (std.error * (qnorm(0.975)))) %>%
+    mutate(sig = case_when(p.value <= 0.001 ~ "***",
+                           p.value <= 0.01 ~ "**",
+                           p.value <= 0.05 ~ "*",
+                           p.value <= 0.1 ~ "+")) %>%
+    bind_rows(., (as_tibble(broom::glance(model_obj)) %>%
+                    select(nobs) %>%
+                    rename(n = nobs) %>%
+                    pivot_longer(cols = everything(), names_to = "term", values_to = "estimate"))) %>%
+    bind_rows(., (as_tibble(broom::glance(model_obj)) %>%
+                    select(r.squared, adj.r.squared, statistic) %>%
+                    rename(R2 = r.squared,
+                           Adj_R2 = adj.r.squared,
+                           `F-statistic` = statistic) %>%
+                    pivot_longer(cols = everything(), names_to = "term", values_to = "estimate"))) %>%
+    bind_rows(., (as_tibble(DescTools::RMSE(model_obj)) %>%
+                    rename(RMSE = value) %>%
+                    pivot_longer(cols = everything(), names_to = "term", values_to = "estimate"))) %>%
+    mutate(model = model_name) %>%
+    rename(t = statistic) %>%
+    mutate(across(c(estimate, std.error, t, Conf.low, Conf.high), ~sprintf("%.3f", round(.x, digits = 3)))) %>%
+    mutate_if(is.character, ~str_replace_all(.x, c("NA"), NA_character_)) %>%
+    mutate_if(is.character, ~str_replace_all(.x, c("(NA)"), NA_character_)) %>%
+    mutate(std.error = case_when(
+      is.na(std.error) == FALSE ~ str_c("(", std.error, ")")
+    )) %>%
+    mutate(ConfI = case_when(
+      is.na(Conf.low) == FALSE & is.na(Conf.high) == FALSE ~ str_c("[", Conf.low, ", ", Conf.high, "]")
+    )) %>%
+    select(model, term, estimate, std.error, ConfI, t, sig)
+  print(model_out, quote = FALSE, right = TRUE, n = 200)
+  model_results <- model_out %>% select(model:ConfI)
+  assign(paste0("summ_", model_name), model_results, envir = .GlobalEnv)
+  openxlsx::addWorksheet(work_book, sheetName = model_name)
+  openxlsx::writeData(work_book, model_name, model_out)
+}
+
 ## Export results for Table A1
 work_book <- createWorkbook()
-model.out(m00)
-model.out(m0)
-model.out(m1)
-model.out(m2)
-model.out(m3)
-model.out(m4)
-model.out(m5)
-model.out(m6)
-model.out(m7)
-model.out(m00.nr)
-model.out(m0.nr)
-model.out(m1.nr)
-model.out(m2.nr)
-model.out(m3.nr)
-model.out(m4.nr)
-model.out(m5.nr)
-model.out(m6.nr)
-model.out(m7.nr)
-saveWorkbook(work_book, "./appendix/Bayesian models-nuclear energy-2026 10 29.xlsx", overwrite = TRUE)
+model.out.bayes(m00)
+model.out.bayes(m0)
+model.out.bayes(m1)
+model.out.bayes(m2)
+model.out.bayes(m3)
+model.out.bayes(m4)
+model.out.bayes(m5)
+model.out.bayes(m6)
+model.out.bayes(m7)
+model.out.bayes(m00a)
+model.out.bayes(m0a)
+model.out.bayes(m1a)
+model.out.bayes(m2a)
+model.out.bayes(m3a)
+model.out.bayes(m4a)
+model.out.bayes(m5a)
+model.out.bayes(m6a)
+model.out.bayes(m7a)
+model.out.freq(m00b)
+model.out.freq(m0b)
+model.out.freq(m1b)
+model.out.freq(m2b)
+model.out.freq(m3b)
+model.out.freq(m4b)
+model.out.freq(m5b)
+model.out.freq(m6b)
+model.out.freq(m7b)
+
+saveWorkbook(work_book, "./appendix/Models-SMRs-UK-2026 11 02.xlsx", overwrite = TRUE)
 
 summ_m3 <- summ_m3 %>% mutate(term = case_when(term == "Scotland_Local" ~ "CountryScotland:LOCLocal", TRUE ~ term))
-summ_m3.nr <- summ_m3.nr %>% mutate(term = case_when(term == "Scotland_Local" ~ "CountryScotland:LOCLocal", TRUE ~ term))
+summ_m3a <- summ_m3a %>% mutate(term = case_when(term == "Scotland_Local" ~ "CountryScotland:LOCLocal", TRUE ~ term))
+summ_m3b <- summ_m3b %>% mutate(term = case_when(term == "Scotland_Local" ~ "CountryScotland:LOCLocal", TRUE ~ term))
+
 
 ## Table A1
 summ_models_a1 <- bind_rows(summ_m0, summ_m1, summ_m2, summ_m3, summ_m4)
@@ -981,7 +1102,6 @@ term_spec <- tribble(
   "CountryWales:LOCLocal",            "Wales \u00d7 Local frame",                                FALSE,
   "CountryScotland:LOCLocal",         "Scotland \u00d7 Local frame",                             FALSE,
   "CountryNorthernIreland:LOCLocal",  "Northern Ireland \u00d7 Local frame",                     FALSE,
-  "LOCLocal:ln_nuclear_dist_km",      "Distance to nearest nuclear site \u00d7 Local frame",     FALSE,
   "LOCLocal:ln_nuclear_dist_km",      "Distance to nearest nuclear site \u00d7 Local frame",     FALSE
 )
 
@@ -1198,9 +1318,9 @@ writeLines(tex, "./manuscript/table_a2.tex")
 
 
 ## Table A3
-summ_models_a3 <- bind_rows(summ_m0.nr, summ_m1.nr, summ_m2.nr, summ_m3.nr, summ_m4.nr)
+summ_models_a3 <- bind_rows(summ_m0a, summ_m1a, summ_m2a, summ_m3a, summ_m4a)
 
-model_levels <- c("m0.nr", "m1.nr", "m2.nr", "m3.nr", "m4.nr")
+model_levels <- c("m0a", "m1a", "m2a", "m3a", "m4a")
 model_labels <- c("Model 0a", "Model 1a", "Model 2a", "Model 3a", "Model 4a")
 
 fit_terms  <- c("n", "R2", "elpd_loo", "looic", "Sigma", "RMSE")
@@ -1209,7 +1329,7 @@ fit_labels <- c(n = "n", R2 = "Bayesian R2", elpd_loo = "ELPD",
 
 stat_cols <- c("Estimate", "Est.Error", "CrI")
 
-model_groups <- list(c("m0.nr", "m1.nr"), c("m2.nr", "m3.nr", "m4.nr"))
+model_groups <- list(c("m0a", "m1a"), c("m2a", "m3a", "m4a"))
 table_captions <- c("Results: Linear models, non-responses on dependent variable removed",
                     "Results: Linear models, non-responses on dependent variable removed (continued)")
 table_labels   <- c("linear-models-wo-dks", NA)
@@ -1307,9 +1427,9 @@ writeLines(tex, "./manuscript/table_a3.tex")
 
 
 ## Table A4
-summ_models_a4 <- bind_rows(summ_m5.nr, summ_m6.nr, summ_m7.nr)
+summ_models_a4 <- bind_rows(summ_m5a, summ_m6a, summ_m7a)
 
-model_levels <- c("m5.nr", "m6.nr", "m7.nr")
+model_levels <- c("m5a", "m6a", "m7a")
 model_labels <- c("Model 5a", "Model 6a", "Model 7a")
 
 fit_terms  <- c("n", "R2", "elpd_loo", "looic", "Sigma", "RMSE")
@@ -1318,7 +1438,7 @@ fit_labels <- c(n = "n", R2 = "Bayesian R2", elpd_loo = "ELPD",
 
 stat_cols <- c("Estimate", "Est.Error", "CrI")
 
-model_groups <- list(c("m5.nr", "m6.nr", "m7.nr"))
+model_groups <- list(c("m5a", "m6a", "m7a"))
 table_captions <- c("Results: Linear models, non-responses on dependent variable removed")
 table_labels   <- c("linear-models-wo-dks-addl")
 
@@ -1412,6 +1532,279 @@ tex <- c("\\begin{landscape}",
          "\\end{landscape}")
 
 writeLines(tex, "./manuscript/table_a4.tex")
+
+
+## Table A5
+summ_models_a5 <- bind_rows(summ_m0b, summ_m1b, summ_m2b, summ_m3b, summ_m4b)
+
+model_levels <- c("m0b", "m1b", "m2b", "m3b", "m4b")
+model_labels <- c("Model 0b", "Model 1b", "Model 2b", "Model 3b", "Model 4b")
+
+fit_terms  <- c("n", "R2", "Adj_R2", "F-statistic", "RMSE")
+fit_labels <- c(n = "n", R2 = "R2", Adj_R2 = "Adjusted R2", `F-statistic` = "F-statistic", RMSE = "RMSE")
+
+stat_cols <- c("estimate", "std.error", "ConfI")
+
+model_groups <- list(c("m0b", "m1b"), c("m2b", "m3b", "m4b"))
+table_captions <- c("Results: Linear models, frequentist estimation (OLS)",
+                    "Results: Linear models, frequentist estimation (OLS)")
+table_labels   <- c("linear-models-freq", NA)
+
+term_spec <- tribble(
+  ~term,                              ~label,                                                    ~indent,
+  "(Intercept)",                      "Intercept",                                               FALSE,
+  NA,                                 "Country (Ref. = England)",                                FALSE,
+  "CountryWales",                     "Wales",                                                   TRUE,
+  "CountryScotland",                  "Scotland",                                                TRUE,
+  "Scotland_Ind_RefYes",              "Scotland--Independence referendum: Yes",                  TRUE,
+  "Scotland_Ind_RefNotyes",           "Scotland--Independence referendum: Not yes",              TRUE,
+  "Scotland_Vote_2024Scotland-SNP",   "Scotland--2024 vote: SNP",                                TRUE,
+  "Scotland_Vote_2024Scotland-Other", "Scotland--2024 vote: Not SNP",                            TRUE,
+  "Scotland_PIDScotland-SNP",         "Scotland--Party ID: SNP",                                 TRUE,
+  "Scotland_PIDScotland-Other",       "Scotland--Party ID: Not SNP",                             TRUE,
+  "CountryNorthernIreland",           "Northern Ireland",                                        TRUE,
+  "CountryNorthern Ireland",          "Northern Ireland",                                        TRUE,
+  "Female",                           "Female",                                                  FALSE,
+  "ln_age_years",                     "Age (Years logged)",                                      FALSE,
+  "Educ",                             "Education",                                               FALSE,
+  NA,                                 "Power source frame (Ref. = power station)",               FALSE,
+  "RPSReactor",                       "Reactor frame",                                           TRUE,
+  NA,                                 "Location frame (Ref. = United Kingdom)",                  FALSE,
+  "LOCLocal",                         "Local frame",                                             TRUE,
+  "ln_nuclear_dist_km",               "Distance to nearest nuclear site (km logged)",            FALSE,
+  "follow_elec",                      "Follow news about electricity",                           FALSE,
+  "need_more_elec",                   "UK needs to produce a lot more electricity",              FALSE,
+  "elec_self_suff",                   "UK should be self-sufficient in electricity",             FALSE,
+  "elec_price_low",                   "Critical to keep the price of electricity in the UK low", FALSE,
+  "trust_govt",                       "Trust in government (factor score)",                      FALSE,
+  "trust_elec",                       "Trust in electricity companies/suppliers (factor score)", FALSE,
+  "climate",                          "Concern with climate change (factor score)",              FALSE,
+  "left_right",                       "Ideology (left\u2013right)",                              FALSE,
+  "CountryWales:LOCLocal",            "Wales \u00d7 Local frame",                                FALSE,
+  "CountryScotland:LOCLocal",         "Scotland \u00d7 Local frame",                             FALSE,
+  "CountryNorthern Ireland:LOCLocal", "Northern Ireland \u00d7 Local frame",                     FALSE,
+  "LOCLocal:ln_nuclear_dist_km",      "Distance to nearest nuclear site \u00d7 Local frame",     FALSE
+)
+
+unmatched_in_data <- setdiff(unique(summ_models_a5$term), c(term_spec$term, fit_terms))
+unmatched_in_spec <- setdiff(na.omit(term_spec$term), unique(summ_models_a5$term))
+if (length(unmatched_in_data) > 0)
+  warning("Terms in data but missing from term_spec (will be DROPPED): ",
+          paste(unmatched_in_data, collapse = ", "))
+if (length(unmatched_in_spec) > 0)
+  warning("Terms in term_spec that match nothing in the data: ",
+          paste(unmatched_in_spec, collapse = ", "))
+
+build_table <- function(mods, caption, label) {
+  labs  <- model_labels[match(mods, model_levels)]
+  n_mod <- length(mods)
+  
+  col_order <- as.vector(t(outer(labs, stat_cols, paste, sep = "__")))
+  
+  wide_tab <- summ_models_a5 %>%
+    filter(model %in% mods) %>%
+    mutate(model   = factor(model, model_levels, model_labels),
+           section = if_else(term %in% fit_terms, "fit", "coef")) %>%
+    select(model, section, term, all_of(stat_cols)) %>%
+    pivot_wider(names_from  = model,
+                values_from = all_of(stat_cols),
+                names_glue  = "{model}__{.value}") %>%
+    select(section, term, any_of(col_order))
+  
+  coef_tab <- term_spec %>%
+    left_join(filter(wide_tab, section == "coef") %>% select(-section),
+              by = "term", na_matches = "never") %>%
+    filter(is.na(term) | if_any(-c(term, label, indent), ~ !is.na(.x))) %>%
+    mutate(term = label)
+  
+  indent_rows <- which(coef_tab$indent)
+  coef_tab    <- coef_tab %>% select(-label, -indent)
+  
+  fit_tab <- wide_tab %>%
+    filter(section == "fit") %>%
+    select(-section) %>%
+    arrange(match(term, fit_terms)) %>%
+    mutate(across(ends_with("__Estimate"),
+                  ~ if_else(term == "n" & !is.na(.x),
+                            formatC(suppressWarnings(as.numeric(.x)),
+                                    format = "d", big.mark = ","),
+                            .x))) %>%
+    mutate(term = unname(fit_labels[term]))
+  
+  tab_df <- bind_rows(coef_tab, fit_tab) %>%
+    mutate(across(everything(), ~ replace_na(as.character(.x), ""))) %>%
+    mutate(across(-term, ~ gsub("-", "$-$", .x, fixed = TRUE))) %>%
+    mutate(term = term %>%
+             gsub("\u00d7", "$\\times$", ., fixed = TRUE) %>%
+             gsub("\u2013", "--", ., fixed = TRUE) %>%
+             gsub("R2", "\\textit{R}\\textsuperscript{2}", ., fixed = TRUE))
+  
+  stopifnot(ncol(tab_df) == 1 + 3 * n_mod)
+  
+  tab_df %>%
+    kbl(format = "latex", booktabs = TRUE, longtable = TRUE,
+        escape = FALSE, linesep = "",
+        caption = caption, label = label,
+        align = c("l", rep(c("r", "r", "c"), n_mod)),
+        col.names = c("", rep(c("\\textbf{Estimate}", "\\textbf{Std. Err.}",
+                                "\\textbf{95\\% CI}"), n_mod))) %>%
+    add_header_above(c(" " = 1,
+                       setNames(rep(3, n_mod), paste0("\\textbf{", labs, "}"))),
+                     escape = FALSE) %>%
+    add_indent(indent_rows) %>%
+    row_spec(nrow(coef_tab), extra_latex_after = "\\midrule") %>%  # rule above fit stats
+    column_spec(1, width = "2.5in") %>%
+    kable_styling(latex_options = "repeat_header") %>%
+    as.character()
+}
+
+note <- paste(
+  "Models are linear models fit by ordinary least squares in R (version 4.6.1). Estimates are presented with",
+  "standard errors in parentheses (Std. Err.) and 95\\% confidence intervals in brackets."
+)
+
+tables <- pmap_chr(list(model_groups, table_captions, table_labels),
+                   ~ build_table(..1, ..2, ..3))
+
+tex <- c("\\begin{landscape}",
+         "\\renewcommand{\\thetable}{A\\arabic{table}}",
+         "\\scriptsize",
+         "\\setlength{\\tabcolsep}{2pt}",
+         "\\renewcommand{\\arraystretch}{0.96}",
+         paste(tables, collapse = "\n\n"),
+         "",
+         "\\vspace{-6pt}",
+         "\\begin{minipage}{\\linewidth}",
+         "\\setlength{\\parskip}{0pt}\\scriptsize",
+         note,
+         "\\end{minipage}",
+         "\\end{landscape}")
+
+writeLines(tex, "./manuscript/table_a5.tex")
+
+
+## Table A6
+summ_models_a6 <- bind_rows(summ_m5b, summ_m6b, summ_m7b)
+
+model_levels <- c("m5b", "m6b", "m7b")
+model_labels <- c("Model 5b", "Model 6b", "Model 7b")
+
+fit_terms  <- c("n", "R2", "Adj_R2", "F-statistic", "RMSE")
+fit_labels <- c(n = "n", R2 = "R2", Adj_R2 = "Adjusted R2", `F-statistic` = "F-statistic", RMSE = "RMSE")
+
+stat_cols <- c("estimate", "std.error", "ConfI")
+
+model_groups <- list(c("m5b", "m6b", "m7b"))
+table_captions <- c("Results: Linear models, frequentist estimation (OLS)")
+table_labels   <- c("linear-models-freq-addl")
+
+unmatched_in_data <- setdiff(unique(summ_models_a6$term), c(term_spec$term, fit_terms))
+unmatched_in_spec <- setdiff(na.omit(term_spec$term), unique(summ_models_a6$term))
+if (length(unmatched_in_data) > 0)
+  warning("Terms in data but missing from term_spec (will be DROPPED): ",
+          paste(unmatched_in_data, collapse = ", "))
+if (length(unmatched_in_spec) > 0)
+  warning("Terms in term_spec that match nothing in the data: ",
+          paste(unmatched_in_spec, collapse = ", "))
+
+build_table <- function(mods, caption, label) {
+  labs  <- model_labels[match(mods, model_levels)]
+  n_mod <- length(mods)
+  
+  col_order <- as.vector(t(outer(labs, stat_cols, paste, sep = "__")))
+  
+  wide_tab <- summ_models_a6 %>%
+    filter(model %in% mods) %>%
+    mutate(model   = factor(model, model_levels, model_labels),
+           section = if_else(term %in% fit_terms, "fit", "coef")) %>%
+    select(model, section, term, all_of(stat_cols)) %>%
+    pivot_wider(names_from  = model,
+                values_from = all_of(stat_cols),
+                names_glue  = "{model}__{.value}") %>%
+    select(section, term, any_of(col_order))
+  
+  coef_tab <- term_spec %>%
+    left_join(filter(wide_tab, section == "coef") %>% select(-section),
+              by = "term", na_matches = "never") %>%
+    filter(is.na(term) | if_any(-c(term, label, indent), ~ !is.na(.x))) %>%
+    mutate(term = label)
+  
+  indent_rows <- which(coef_tab$indent)
+  coef_tab    <- coef_tab %>% select(-label, -indent)
+  
+  fit_tab <- wide_tab %>%
+    filter(section == "fit") %>%
+    select(-section) %>%
+    arrange(match(term, fit_terms)) %>%
+    mutate(across(ends_with("__Estimate"),
+                  ~ if_else(term == "n" & !is.na(.x),
+                            formatC(suppressWarnings(as.numeric(.x)),
+                                    format = "d", big.mark = ","),
+                            .x))) %>%
+    mutate(term = unname(fit_labels[term]))
+  
+  tab_df <- bind_rows(coef_tab, fit_tab) %>%
+    mutate(across(everything(), ~ replace_na(as.character(.x), ""))) %>%
+    mutate(across(-term, ~ gsub("-", "$-$", .x, fixed = TRUE))) %>%
+    mutate(term = term %>%
+             gsub("\u00d7", "$\\times$", ., fixed = TRUE) %>%
+             gsub("\u2013", "--", ., fixed = TRUE) %>%
+             gsub("R2", "\\textit{R}\\textsuperscript{2}", ., fixed = TRUE))
+  
+  stopifnot(ncol(tab_df) == 1 + 3 * n_mod)
+  
+  tab_df %>%
+    kbl(format = "latex", booktabs = TRUE, longtable = TRUE,
+        escape = FALSE, linesep = "",
+        caption = caption, label = label,
+        align = c("l", rep(c("r", "r", "c"), n_mod)),
+        col.names = c("", rep(c("\\textbf{Estimate}", "\\textbf{Std. Err.}",
+                                "\\textbf{95\\% CI}"), n_mod))) %>%
+    add_header_above(c(" " = 1,
+                       setNames(rep(3, n_mod), paste0("\\textbf{", labs, "}"))),
+                     escape = FALSE) %>%
+    add_indent(indent_rows) %>%
+    row_spec(nrow(coef_tab), extra_latex_after = "\\midrule") %>%  # rule above fit stats
+    column_spec(1, width = "2.5in") %>%
+    kable_styling(latex_options = "repeat_header") %>%
+    as.character()
+}
+
+tables <- pmap_chr(list(model_groups, table_captions, table_labels),
+                   ~ build_table(..1, ..2, ..3))
+
+tex <- c("\\begin{landscape}",
+         "\\renewcommand{\\thetable}{A\\arabic{table}}",
+         "\\scriptsize",
+         "\\setlength{\\tabcolsep}{2pt}",
+         "\\renewcommand{\\arraystretch}{0.96}",
+         paste(tables, collapse = "\n\n"),
+         "",
+         "\\vspace{-6pt}",
+         "\\begin{minipage}{\\linewidth}",
+         "\\setlength{\\parskip}{0pt}\\scriptsize",
+         note,
+         "\\end{minipage}",
+         "\\end{landscape}")
+
+writeLines(tex, "./manuscript/table_a6.tex")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## Figures
 ## Plot of unadjusted means by condition

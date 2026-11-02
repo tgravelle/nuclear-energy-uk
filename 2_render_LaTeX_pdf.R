@@ -9,4 +9,3 @@ latexmk("./ep-submission/title_page.tex", clean = TRUE, pdf_file = "./ep-submiss
 latexmk("./ep-submission/highlights.tex", clean = TRUE, pdf_file = "./ep-submission/highlights.pdf")
 latexmk("./ep-submission/manuscript_anon.tex", clean = TRUE, pdf_file = "./ep-submission/manuscript_anon.pdf")
 latexmk("./ep-submission/appendix_tables.tex", clean = TRUE, pdf_file = "./ep-submission/appendix_tables.pdf")
-
