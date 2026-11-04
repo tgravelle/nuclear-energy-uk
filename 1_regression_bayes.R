@@ -843,6 +843,7 @@ m1b <- lm(support_smr ~ Country + Female + ln_age_years + Educ
           + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right,
           data = data.2, weights = weight)
 tidy(m1b)
+tidy(m1b) %>% mutate(p.value.one.tail = p.value / 2)
 
 m2b <- lm(support_smr ~ Country + Female + ln_age_years + Educ
           + RPS + LOC + ln_nuclear_dist_km
