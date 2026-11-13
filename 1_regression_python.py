@@ -1,0 +1,1192 @@
+import arviz as az
+import numpy as np
+import pandas as pd
+import patsy
+import pymc as pm
+import rpy2.robjects as ro
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+from rpy2.robjects import default_converter, pandas2ri
+from rpy2.robjects.conversion import localconverter
+
+data_url = "https://raw.githubusercontent.com/tgravelle/nuclear-energy-uk/refs/heads/main/data/UK_SMR.csv"
+data_0 = pd.read_csv(data_url)
+del data_url
+
+print(data_0)
+
+print(data_0['weight'].describe())
+
+print(pd.crosstab(index=data_0['SMNR_UK'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['SMNP_UK'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['SMNR_LOCAL'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['SMNP_LOCAL'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['SEX'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['AGE'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['EDU'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['COUNTRY'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['MII'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['LOCAL_ECON'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['LOCAL_ENVT'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['FOLLOW_ELEC'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['ELECTRICITY_1'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['ELECTRICITY_2'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['ELECTRICITY_3'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['ELECTRICITY_4'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['CLIMATE_1'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['CLIMATE_2'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['CLIMATE_3'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['CLIMATE_4'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['CLIMATE_5'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['TRUST_1'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['TRUST_2'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['TRUST_3'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['TRUST_13'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['TRUST_14'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['TRUST_15'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+print(pd.crosstab(index=data_0['LEFT_RIGHT'], columns=data_0['condition'], values=data_0['weight'], aggfunc='sum', normalize='columns')*100)
+
+data_1 = data_0.copy()
+
+data_1["condition"] = pd.Categorical(data_1["condition"], categories=[1, 2, 3, 4])
+
+data_1["support_smr"] = pd.Series(3.0, index=data_1.index).case_when([
+    (data_1.SMNR_UK.isin(range(1, 6))
+    | data_1.SMNP_UK.isin(range(1, 6))
+    | data_1.SMNR_LOCAL.isin(range(1, 6))
+    | data_1.SMNP_LOCAL.isin(range(1, 6)),
+     6 - data_1.SMNR_UK
+     .combine_first(data_1.SMNP_UK)
+     .combine_first(data_1.SMNR_LOCAL)
+     .combine_first(data_1.SMNP_LOCAL)),
+    ((data_1.SMNR_UK == 6)
+    | (data_1.SMNP_UK == 6)
+    | (data_1.SMNR_LOCAL == 6)
+    | (data_1.SMNP_LOCAL == 6),
+    3)
+])
+
+data_1["support_smr_nr"] = pd.Series(-99.0, index=data_1.index).case_when([
+    (data_1.SMNR_UK.isin(range(1, 6))
+    | data_1.SMNP_UK.isin(range(1, 6))
+    | data_1.SMNR_LOCAL.isin(range(1, 6))
+    | data_1.SMNP_LOCAL.isin(range(1, 6)),
+     6 - data_1.SMNR_UK
+     .combine_first(data_1.SMNP_UK)
+     .combine_first(data_1.SMNR_LOCAL)
+     .combine_first(data_1.SMNP_LOCAL)),
+    ((data_1.SMNR_UK == 6)
+    | (data_1.SMNP_UK == 6)
+    | (data_1.SMNR_LOCAL == 6)
+    | (data_1.SMNP_LOCAL == 6),
+    -99)
+])
+
+data_1["RPS"] = pd.Categorical(data_1["RPS"], categories=["Power Station", "Reactor"])
+
+data_1["LOC"] = pd.Categorical(data_1["LOC"], categories=["UK", "Local"])
+
+data_1["Female"] = pd.Series(0.5, index=data_1.index).case_when([
+    (data_1["GENDER"] == 1, 0.0),
+    (data_1["GENDER"] == 2, 1.0),
+    (data_1["SEX_panel"] == "Male", 0.0),
+    (data_1["SEX_panel"] == "Female", 1.0)
+])
+
+data_1["ln_age_years"] = np.log(data_1["AgeYears"])
+data_1["ln_age_years"] = data_1["ln_age_years"] - np.average(data_1["ln_age_years"], weights = data_1["weight"])
+
+data_1["ln_nuclear_dist_km"] = data_1["ln_nuclear_dist_km"] - np.average(data_1["ln_nuclear_dist_km"], weights = data_1["weight"])
+
+data_1["ed"] = data_1["EDU_panel"].case_when([
+    (data_1["EDUCATION"].isin([10, 11, 12, 17, 19, -99]), "O-level/GCSE/None"),
+    (data_1["EDUCATION"].isin([7, 8]), "A-level"),
+    (data_1["EDUCATION"].isin([3, 4, 5, 6, 9, 13, 14, 15, 16, 18]), "HND/HNC/trade"),
+    (data_1["EDUCATION"] == 2, "Bachelor degree"),
+    (data_1["EDUCATION"] == 1, "Postgraduate degree")
+])
+
+data_1["Educ"] = pd.Series(0.0, index=data_1.index).case_when([
+    (data_1["ed"] == "A-level", 0.25),
+    (data_1["ed"] == "HND/HNC/trade", 0.5),
+    (data_1["ed"] == "Bachelor degree", 0.75),
+    (data_1["ed"] == "Postgraduate degree", 1.0)
+])
+
+data_1["Educ"] = data_1["Educ"] - np.average(data_1["Educ"], weights = data_1["weight"])
+
+data_1 = data_1.drop(columns=['ed'])
+
+data_1["Country"] = pd.Categorical(data_1["COUNTRY"], categories=["England", "Wales", "Scotland", "Northern Ireland"])
+
+data_1["CountryWales"] = pd.Series(0.0, index=data_1.index).case_when([
+    (data_1["Country"] == "Wales", 1)
+])
+
+data_1["CountryNorthernIreland"] = pd.Series(0.0, index=data_1.index).case_when([
+    (data_1["Country"] == "Northern Ireland", 1)
+])
+
+data_1["mii_col"] = pd.Series(0.0, index=data_1.index).case_when([
+    (data_1["MII"] == 9, 1)
+])
+
+data_1["left_right"] = data_1["LEFT_RIGHT"]
+
+data_1["local_econ"] = 6 - data_1["LOCAL_ECON"]
+
+data_1["local_envt"] = 6 - data_1["LOCAL_ENVT"]
+
+data_1["elec_envt_friendly"] = 6 - data_1["ELECTRICITY_1"]
+
+data_1["need_more_elec"] = 6 - data_1["ELECTRICITY_2"]
+
+data_1["elec_self_suff"] = 6 - data_1["ELECTRICITY_3"]
+
+data_1["elec_price_low"] = 6 - data_1["ELECTRICITY_4"]
+
+data_1["cc_problem"] = 6 - data_1["CLIMATE_1"]
+
+data_1["envt_exagg_r"] = data_1["CLIMATE_2"]
+
+data_1["cc_action"] = 6 - data_1["CLIMATE_3"]
+
+data_1["cc_uncert_occ_r"] = data_1["CLIMATE_4"]
+
+data_1["cc_uncert_eff_r"] = data_1["CLIMATE_5"]
+
+data_1["follow_elec"] = 5 - data_1["FOLLOW_ELEC"]
+
+data_1["trust_westminster"] = 5 - data_1["TRUST_1"]
+
+data_1["trust_pm"] = 5 - data_1["TRUST_2"]
+
+data_1["trust_pm"] = 5 - data_1["TRUST_2"]
+
+data_1["trust_local_mp"] = 5 - data_1["TRUST_3"]
+
+data_1["trust_council"] = 5 - data_1["TRUST_13"]
+
+data_1["trust_elec_cos"] = 5 - data_1["TRUST_14"]
+
+data_1["trust_elec_supp"] = 5 - data_1["TRUST_15"]
+
+five_cat = ["left_right", "local_econ", "local_envt", "elec_envt_friendly",
+            "need_more_elec", "elec_self_suff", "elec_price_low", "cc_problem",
+            "envt_exagg_r", "cc_action", "cc_uncert_occ_r", "cc_uncert_eff_r"]
+
+four_cat = ["follow_elec", "trust_westminster", "trust_pm", "trust_local_mp",
+            "trust_council", "trust_elec_cos", "trust_elec_supp"]
+
+data_1[five_cat] = data_1[five_cat].where(data_1[five_cat].isin(range(1, 6)))  # keep 1-5, else NA
+
+data_1[four_cat] = data_1[four_cat].where(data_1[four_cat].isin(range(1, 5)))  # keep 1-4, else NA
+
+del [five_cat, four_cat]
+
+data_1["VOTE2024"] = pd.Series("DNV", index=data_1.index).case_when([
+    (data_1["VOTE_2024"] == 2, "Labour"),
+    (data_1["VOTE_2024"] == 1, "Conservative"),
+    (data_1["VOTE_2024"] == 3, "Liberal Democrat"),
+    (data_1["VOTE_2024"] == 13, "Reform UK"),
+    (data_1["VOTE_2024"] == 4, "Scottish National Party"),
+    (data_1["VOTE_2024"] == 6, "Plaid Cymru"),
+    (data_1["VOTE_2024"] == 10, "Nationalist"),
+    (data_1["VOTE_2024"].isin([8, 11, 12]), "Unionist"),
+    (data_1["VOTE_2024"] == 14, "Other"),
+])
+data_1["VOTE2024"] = pd.Categorical(data_1["VOTE2024"],
+    categories=["Labour", "Conservative", "Liberal Democrat", "Reform UK",
+    "Scottish National Party", "Plaid Cymru", "Nationalist", "Unionist", "Other", "DNV"])
+
+data_1["Scotland_Local"] = pd.Series(0.0, index=data_1.index).case_when([
+    ((data_1["Country"] == "Scotland") & (data_1["LOC"] == "Local"), 1)
+])
+
+data_1["Scotland_Ind_Ref"] = pd.Series("Outside Scotland", index=data_1.index).case_when([
+    ((data_1["Country"] == "Scotland") & (data_1["IND_SCOTLAND"] == 1), "Yes"),
+    (data_1["Country"] == "Scotland", "Not yes")
+])
+data_1["Scotland_Ind_Ref"] = pd.Categorical(data_1["Scotland_Ind_Ref"],
+    categories=["Outside Scotland", "Yes", "Not yes"])
+
+data_1["Scotland_Vote_2024"] = pd.Series("Outside Scotland", index=data_1.index).case_when([
+    ((data_1["Country"] == "Scotland") & (data_1["VOTE2024"] == "Scottish National Party"), "Scotland-SNP"),
+    (data_1["Country"] == "Scotland", "Scotland-Other")
+])
+data_1["Scotland_Vote_2024"] = pd.Categorical(data_1["Scotland_Vote_2024"],
+    categories=["Outside Scotland", "Scotland-SNP", "Scotland-Other"])
+
+data_1["Scotland_PID"] = pd.Series("Outside Scotland", index=data_1.index).case_when([
+    ((data_1["Country"] == "Scotland") & (data_1["PID"] == 4), "Scotland-SNP"),
+    (data_1["Country"] == "Scotland", "Scotland-Other")
+])
+data_1["Scotland_PID"] = pd.Categorical(data_1["Scotland_PID"],
+    categories=["Outside Scotland", "Scotland-SNP", "Scotland-Other"])
+
+print(data_1['condition'].value_counts().sort_index())
+print(pd.crosstab(index=data_1['condition'], columns=data_1['Country'], values=data_1['condition'], aggfunc='count'))
+print(data_1['RPS'].value_counts().sort_index())
+print(data_1['LOC'].value_counts().sort_index())
+print(data_1['support_smr'].value_counts().sort_index())
+print(data_1['support_smr_nr'].value_counts().sort_index())
+print(data_1['Female'].value_counts().sort_index())
+print(data_1['Educ'].value_counts().sort_index())
+print(data_1['Country'].value_counts().sort_index())
+print(data_1['CountryWales'].value_counts().sort_index())
+print(data_1['CountryNorthernIreland'].value_counts().sort_index())
+print(data_1['local_econ'].value_counts().sort_index())
+print(data_1['local_envt'].value_counts().sort_index())
+print(data_1['elec_envt_friendly'].value_counts().sort_index())
+print(data_1['need_more_elec'].value_counts().sort_index())
+print(data_1['elec_self_suff'].value_counts().sort_index())
+print(data_1['elec_price_low'].value_counts().sort_index())
+print(data_1['cc_problem'].value_counts().sort_index())
+print(data_1['envt_exagg_r'].value_counts().sort_index())
+print(data_1['cc_action'].value_counts().sort_index())
+print(data_1['cc_uncert_occ_r'].value_counts().sort_index())
+print(data_1['cc_uncert_eff_r'].value_counts().sort_index())
+print(data_1['follow_elec'].value_counts().sort_index())
+print(data_1['trust_westminster'].value_counts().sort_index())
+print(data_1['trust_pm'].value_counts().sort_index())
+print(data_1['trust_local_mp'].value_counts().sort_index())
+print(data_1['trust_council'].value_counts().sort_index())
+print(data_1['trust_elec_cos'].value_counts().sort_index())
+print(data_1['trust_elec_supp'].value_counts().sort_index())
+print(data_1['left_right'].value_counts().sort_index())
+print(data_1['VOTE2024'].value_counts().sort_index())
+print(data_1.loc[data_1["Country"] == "Scotland", "VOTE2024"].value_counts().sort_index())
+print(data_1['Scotland_Ind_Ref'].value_counts().sort_index())
+print(data_1['Scotland_Vote_2024'].value_counts().sort_index())
+print(data_1['Scotland_PID'].value_counts().sort_index())
+
+cols = ["local_econ", "local_envt"]
+d = data_1[cols + ["weight"]].dropna()
+pd.DataFrame(sm.stats.DescrStatsW(d[cols], weights=d["weight"]).corrcoef, index=cols, columns=cols)
+
+cols = ["elec_envt_friendly", "need_more_elec", "elec_self_suff", "elec_price_low"]
+d = data_1[cols + ["weight"]].dropna()
+pd.DataFrame(sm.stats.DescrStatsW(d[cols], weights=d["weight"]).corrcoef, index=cols, columns=cols)
+
+cols = ["cc_problem", "envt_exagg_r", "cc_action", "cc_uncert_occ_r"]
+d = data_1[cols + ["weight"]].dropna()
+pd.DataFrame(sm.stats.DescrStatsW(d[cols], weights=d["weight"]).corrcoef, index=cols, columns=cols)
+
+cols = ["trust_westminster", "trust_pm", "trust_local_mp", "trust_council"]
+d = data_1[cols + ["weight"]].dropna()
+pd.DataFrame(sm.stats.DescrStatsW(d[cols], weights=d["weight"]).corrcoef, index=cols, columns=cols)
+
+cols = ["trust_elec_cos", "trust_elec_supp"]
+d = data_1[cols + ["weight"]].dropna()
+pd.DataFrame(sm.stats.DescrStatsW(d[cols], weights=d["weight"]).corrcoef, index=cols, columns=cols)
+
+def wtd_alpha(df, cols, wcol="weight"):
+    d = df[cols + [wcol]].dropna()
+    cov = np.cov(d[cols].to_numpy().T, aweights=d[wcol].to_numpy())
+    k = len(cols)
+    return k / (k - 1) * (1 - np.trace(cov) / cov.sum())
+
+wtd_alpha(data_1, ["local_econ", "local_envt"])
+wtd_alpha(data_1, ["need_more_elec", "elec_self_suff", "elec_price_low"])
+wtd_alpha(data_1, ["cc_problem", "envt_exagg_r", "cc_action", "cc_uncert_occ_r"])
+wtd_alpha(data_1, ["trust_westminster", "trust_pm", "trust_local_mp", "trust_council"])
+wtd_alpha(data_1, ["trust_elec_cos", "trust_elec_supp"])
+
+del [cols, d]
+
+data_1_cfa = data_1[["ResponseId", "weight"] + list(data_1.loc[:, "local_econ":"trust_elec_supp"].columns)]
+
+# CFA in lavaan (in R) for trust, climate concern
+with localconverter(default_converter + pandas2ri.converter):
+    ro.globalenv["data_1"] = data_1_cfa
+
+ro.r('''
+library(tidyverse)
+library(lavaan)
+library(semTools)
+
+cfa_model <-
+  '
+  trust_govt =~ NA*trust_westminster + trust_pm + trust_local_mp + trust_council
+  trust_elec =~ A*trust_elec_supp + B*trust_elec_cos
+  climate =~ NA*cc_problem + envt_exagg_r + cc_action + cc_uncert_occ_r
+  A == B
+  trust_govt ~~ 1*trust_govt
+  climate ~~ 1*climate
+  trust_local_mp ~~ trust_council
+  trust_westminster ~~ trust_pm
+  cc_problem ~~ cc_action
+'
+
+cfa_fit <- cfa(cfa_model, data = data_1, ordered = TRUE, estimator = "WLSMV", sampling.weights = "weight",
+               missing = "pairwise", parameterization = "theta", mimic = "Mplus")
+print(summary(cfa_fit, fit.measures = TRUE, standardized = TRUE))
+print(modindices(cfa_fit, standardized = TRUE, maximum.number = 20, sort = TRUE))
+print(compRelSEM(cfa_fit, ord.scale = TRUE))
+
+data_1a <- data_1 %>%
+  bind_cols(., (lavPredict(object = cfa_fit, type = "lv", method = "EBM", append.data = FALSE) %>%
+                  as.data.frame() %>% as_tibble()))
+''')
+
+with localconverter(default_converter + pandas2ri.converter):
+    data_1a = ro.conversion.rpy2py(ro.globalenv["data_1a"])
+
+data_1a = data_1a[["ResponseId", "trust_govt", "trust_elec", "climate"]]
+
+data_2 = data_1.merge(data_1a, how="left", on="ResponseId")
+
+def range_std(x):
+    return (x - x.min()) / (x.max() - x.min())
+
+def range_centre(x, w):
+    x = (x - x.min()) / (x.max() - x.min())
+    return x - np.average(x, weights=w)
+
+data_2["support_smr"] = range_std(data_2["support_smr"]) - 0.5
+
+data_2["follow_elec"] = pd.Series(1.0, index=data_2.index).case_when([
+    (data_2["follow_elec"].isin(range(1, 5)), data_2["follow_elec"]),
+])
+data_2["follow_elec"] = range_centre(data_2["follow_elec"], data_2["weight"])
+
+data_2["need_more_elec"] = pd.Series(3.0, index=data_2.index).case_when([
+    (data_2["need_more_elec"].isin(range(1, 6)), data_2["need_more_elec"]),
+])
+data_2["need_more_elec"] = range_centre(data_2["need_more_elec"], data_2["weight"])
+
+data_2["elec_self_suff"] = pd.Series(3.0, index=data_2.index).case_when([
+    (data_2["elec_self_suff"].isin(range(1, 6)), data_2["elec_self_suff"]),
+])
+data_2["elec_self_suff"] = range_centre(data_2["elec_self_suff"], data_2["weight"])
+
+data_2["elec_price_low"] = pd.Series(3.0, index=data_2.index).case_when([
+    (data_2["elec_price_low"].isin(range(1, 6)), data_2["elec_price_low"]),
+])
+data_2["elec_price_low"] = range_centre(data_2["elec_price_low"], data_2["weight"])
+
+data_2["local_econ"] = pd.Series(3.0, index=data_2.index).case_when([
+    (data_2["local_econ"].isin(range(1, 6)), data_2["local_econ"]),
+])
+data_2["local_econ"] = range_centre(data_2["local_econ"], data_2["weight"])
+
+data_2["local_envt"] = pd.Series(3.0, index=data_2.index).case_when([
+    (data_2["local_envt"].isin(range(1, 6)), data_2["local_envt"]),
+])
+data_2["local_envt"] = range_centre(data_2["local_envt"], data_2["weight"])
+
+data_2["trust_govt"] = range_centre(data_2["trust_govt"], data_2["weight"])
+
+data_2["trust_elec"] = range_centre(data_2["trust_elec"], data_2["weight"])
+
+data_2["climate"] = range_centre(data_2["climate"], data_2["weight"])
+
+data_2["climate"] = range_centre(data_2["climate"], data_2["weight"])
+
+data_2["left_right"] = pd.Series(3.0, index=data_2.index).case_when([
+    (data_2["left_right"].isin(range(1, 6)), data_2["left_right"]),
+])
+data_2["left_right"] = range_centre(data_2["left_right"], data_2["weight"])
+
+print(data_2['support_smr'].describe())
+print(data_2['ln_age_years'].describe())
+print(data_2['follow_elec'].describe())
+print(data_2['need_more_elec'].describe())
+print(data_2['elec_self_suff'].describe())
+print(data_2['elec_price_low'].describe())
+print(data_2['local_econ'].describe())
+print(data_2['local_envt'].describe())
+print(data_2['trust_govt'].describe())
+print(data_2['trust_elec'].describe())
+print(data_2['climate'].describe())
+print(data_2['left_right'].describe())
+print(data_2['ln_nuclear_dist_km'].describe())
+
+data_2a = data_2[data_2["support_smr_nr"] != -99]
+
+## Bayesian regression models
+y = data_2["support_smr"].to_numpy(dtype=float)
+w = data_2["weight"].to_numpy(dtype=float)
+ds = sm.stats.DescrStatsW(y, weights=w, ddof=1)
+mean_y = ds.mean
+sd_y = np.sqrt(ds.var)
+range_age = data_2["ln_age_years"].max() - data_2["ln_age_years"].min()
+range_dist = data_2["ln_nuclear_dist_km"].max() - data_2["ln_nuclear_dist_km"].min()
+
+## M00
+X = patsy.dmatrix(
+    "1 + RPS + LOC + RPS*LOC",
+    data_2, return_type="dataframe")
+X = X.drop(columns="Intercept")
+names = list(X.columns)
+x_means = X.mean()
+Xc = X - x_means
+b_mu = pd.Series(0.0, index=names)
+b_sd = pd.Series(0.5 * sd_y, index=names)
+for k in ["RPS[T.Reactor]", "LOC[T.Local]"]:
+    b_mu[k], b_sd[k] = -0.0625, 0.05
+with pm.Model(coords={"coef": names}) as m:
+    Intercept = pm.Normal("Intercept", mean_y, sd_y)
+    b = pm.Normal("b", mu=b_mu.values, sigma=b_sd.values, dims="coef")
+    sigma = pm.Exponential("sigma", lam=1 / sd_y)
+    mu = Intercept + pm.math.dot(Xc.values, b)
+    pm.Potential("weighted_lik",
+        (w * pm.logp(pm.Normal.dist(mu, sigma), y)).sum())
+    idata = pm.sample(draws=10000, tune=2000, chains=5, cores=5,
+        random_seed=20261008, nuts_sampler="nutpie")      
+post = idata.posterior
+b_draws = post["b"].values
+inter_draws = post["Intercept"].values
+b_Intercept = inter_draws - (b_draws * x_means.values).sum(axis=-1)
+flat = b_Intercept.ravel()
+lo, hi = np.quantile(flat, [0.025, 0.975])
+print(f"\nb[Intercept] (original scale): mean={flat.mean():.3f}  "
+      f"sd={flat.std(ddof=1):.3f}  95% ETI=({lo:.3f}, {hi:.3f})")
+print(az.summary(idata, var_names=["b", "sigma"], round_to=3, ci_prob=0.95))
+
+## M0
+X = patsy.dmatrix(
+    "1 + Country + Female + ln_age_years + Educ + RPS + LOC + ln_nuclear_dist_km",
+    data_2, return_type="dataframe")
+X = X.drop(columns="Intercept")
+names = list(X.columns)
+x_means = X.mean()
+Xc = X - x_means
+b_mu = pd.Series(0.0, index=names)
+b_sd = pd.Series(0.5 * sd_y, index=names)
+b_sd["ln_age_years"] = 0.5 * sd_y / range_age
+b_sd["ln_nuclear_dist_km"] = 0.5 * sd_y / range_dist
+for k in ["RPS[T.Reactor]", "LOC[T.Local]"]:
+    b_mu[k], b_sd[k] = -0.0625, 0.05
+with pm.Model(coords={"coef": names}) as m:
+    Intercept = pm.Normal("Intercept", mean_y, sd_y)
+    b = pm.Normal("b", mu=b_mu.values, sigma=b_sd.values, dims="coef")
+    sigma = pm.Exponential("sigma", lam=1 / sd_y)
+    mu = Intercept + pm.math.dot(Xc.values, b)
+    pm.Potential("weighted_lik",
+        (w * pm.logp(pm.Normal.dist(mu, sigma), y)).sum())
+    idata = pm.sample(draws=10000, tune=2000, chains=5, cores=5,
+        random_seed=20261008, nuts_sampler="nutpie")      
+post = idata.posterior
+b_draws = post["b"].values
+inter_draws = post["Intercept"].values
+b_Intercept = inter_draws - (b_draws * x_means.values).sum(axis=-1)
+flat = b_Intercept.ravel()
+lo, hi = np.quantile(flat, [0.025, 0.975])
+print(f"\nb[Intercept] (original scale): mean={flat.mean():.3f}  "
+      f"sd={flat.std(ddof=1):.3f}  95% ETI=({lo:.3f}, {hi:.3f})")
+print(az.summary(idata, var_names=["b", "sigma"], round_to=3, ci_prob=0.95))
+
+## M1
+X = patsy.dmatrix(
+    "1 + Country + Female + ln_age_years + Educ + RPS + LOC + ln_nuclear_dist_km"
+    " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+    " + trust_govt + trust_elec + climate + left_right",
+    data_2, return_type="dataframe")
+X = X.drop(columns="Intercept")
+names = list(X.columns)
+x_means = X.mean()
+Xc = X - x_means
+b_mu = pd.Series(0.0, index=names)
+b_sd = pd.Series(0.5 * sd_y, index=names)
+b_sd["ln_age_years"] = 0.5 * sd_y / range_age
+b_sd["ln_nuclear_dist_km"] = 0.5 * sd_y / range_dist
+for k in ["RPS[T.Reactor]", "LOC[T.Local]"]:
+    b_mu[k], b_sd[k] = -0.0625, 0.05
+with pm.Model(coords={"coef": names}) as m:
+    Intercept = pm.Normal("Intercept", mean_y, sd_y)
+    b = pm.Normal("b", mu=b_mu.values, sigma=b_sd.values, dims="coef")
+    sigma = pm.Exponential("sigma", lam=1 / sd_y)
+    mu = Intercept + pm.math.dot(Xc.values, b)
+    pm.Potential("weighted_lik",
+        (w * pm.logp(pm.Normal.dist(mu, sigma), y)).sum())
+    idata = pm.sample(draws=10000, tune=2000, chains=5, cores=5,
+        random_seed=20261008, nuts_sampler="nutpie")      
+post = idata.posterior
+b_draws = post["b"].values
+inter_draws = post["Intercept"].values
+b_Intercept = inter_draws - (b_draws * x_means.values).sum(axis=-1)
+flat = b_Intercept.ravel()
+lo, hi = np.quantile(flat, [0.025, 0.975])
+print(f"\nb[Intercept] (original scale): mean={flat.mean():.3f}  "
+      f"sd={flat.std(ddof=1):.3f}  95% ETI=({lo:.3f}, {hi:.3f})")
+print(az.summary(idata, var_names=["b", "sigma"], round_to=3, ci_prob=0.95))
+
+for label, col in [("RPSReactor", "RPS[T.Reactor]"), ("LOCLocal", "LOC[T.Local]")]:
+    d = b_draws[..., names.index(col)].ravel()
+    print(f"{label}: P(b >= 0) = {np.mean(d >= 0):.4f}   P(b < 0) = {np.mean(d < 0):.4f}")
+
+## M2
+X = patsy.dmatrix(
+    "1 + Country + Female + ln_age_years + Educ + RPS + LOC + ln_nuclear_dist_km"
+    " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+    " + trust_govt + trust_elec + climate + left_right"
+    " + LOC*Country",
+    data_2, return_type="dataframe")
+X = X.drop(columns="Intercept")
+names = list(X.columns)
+x_means = X.mean()
+Xc = X - x_means
+b_mu = pd.Series(0.0, index=names)
+b_sd = pd.Series(0.5 * sd_y, index=names)
+b_sd["ln_age_years"] = 0.5 * sd_y / range_age
+b_sd["ln_nuclear_dist_km"] = 0.5 * sd_y / range_dist
+for k in ["RPS[T.Reactor]", "LOC[T.Local]"]:
+    b_mu[k], b_sd[k] = -0.0625, 0.05
+with pm.Model(coords={"coef": names}) as m:
+    Intercept = pm.Normal("Intercept", mean_y, sd_y)
+    b = pm.Normal("b", mu=b_mu.values, sigma=b_sd.values, dims="coef")
+    sigma = pm.Exponential("sigma", lam=1 / sd_y)
+    mu = Intercept + pm.math.dot(Xc.values, b)
+    pm.Potential("weighted_lik",
+        (w * pm.logp(pm.Normal.dist(mu, sigma), y)).sum())
+    idata = pm.sample(draws=10000, tune=2000, chains=5, cores=5,
+        random_seed=20261008, nuts_sampler="nutpie")      
+post = idata.posterior
+b_draws = post["b"].values
+inter_draws = post["Intercept"].values
+b_Intercept = inter_draws - (b_draws * x_means.values).sum(axis=-1)
+flat = b_Intercept.ravel()
+lo, hi = np.quantile(flat, [0.025, 0.975])
+print(f"\nb[Intercept] (original scale): mean={flat.mean():.3f}  "
+      f"sd={flat.std(ddof=1):.3f}  95% ETI=({lo:.3f}, {hi:.3f})")
+print(az.summary(idata, var_names=["b", "sigma"], round_to=3, ci_prob=0.95))
+
+for label, col in [("RPSReactor", "RPS[T.Reactor]"), ("LOCLocal", "LOC[T.Local]")]:
+    d = b_draws[..., names.index(col)].ravel()
+    print(f"{label}: P(b >= 0) = {np.mean(d >= 0):.4f}   P(b < 0) = {np.mean(d < 0):.4f}")
+
+## M3
+X = patsy.dmatrix(
+    "1 + Country + Female + ln_age_years + Educ + RPS + LOC + ln_nuclear_dist_km"
+    " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+    " + trust_govt + trust_elec + climate + left_right"
+    " + Scotland_Local",
+    data_2, return_type="dataframe")
+X = X.drop(columns="Intercept")
+names = list(X.columns)
+x_means = X.mean()
+Xc = X - x_means
+b_mu = pd.Series(0.0, index=names)
+b_sd = pd.Series(0.5 * sd_y, index=names)
+b_sd["ln_age_years"] = 0.5 * sd_y / range_age
+b_sd["ln_nuclear_dist_km"] = 0.5 * sd_y / range_dist
+for k in ["RPS[T.Reactor]", "LOC[T.Local]"]:
+    b_mu[k], b_sd[k] = -0.0625, 0.05
+with pm.Model(coords={"coef": names}) as m:
+    Intercept = pm.Normal("Intercept", mean_y, sd_y)
+    b = pm.Normal("b", mu=b_mu.values, sigma=b_sd.values, dims="coef")
+    sigma = pm.Exponential("sigma", lam=1 / sd_y)
+    mu = Intercept + pm.math.dot(Xc.values, b)
+    pm.Potential("weighted_lik",
+        (w * pm.logp(pm.Normal.dist(mu, sigma), y)).sum())
+    idata = pm.sample(draws=10000, tune=2000, chains=5, cores=5,
+        random_seed=20261008, nuts_sampler="nutpie")      
+post = idata.posterior
+b_draws = post["b"].values
+inter_draws = post["Intercept"].values
+b_Intercept = inter_draws - (b_draws * x_means.values).sum(axis=-1)
+flat = b_Intercept.ravel()
+lo, hi = np.quantile(flat, [0.025, 0.975])
+print(f"\nb[Intercept] (original scale): mean={flat.mean():.3f}  "
+      f"sd={flat.std(ddof=1):.3f}  95% ETI=({lo:.3f}, {hi:.3f})")
+print(az.summary(idata, var_names=["b", "sigma"], round_to=3, ci_prob=0.95))
+
+def coef_draws(name):
+    return b_draws[..., names.index(name)].ravel()
+
+rps       = coef_draws("RPS[T.Reactor]")
+loc       = coef_draws("LOC[T.Local]")
+scot_loc  = coef_draws("Scotland_Local")
+loc_plus_scot = loc + scot_loc        # = b_LOCLocal_plus_Scotland_Local in R
+
+def prob_report(label, d):
+    print(f"{label}: P(>= 0) = {np.mean(d >= 0):.4f}   P(< 0) = {np.mean(d < 0):.4f}")
+
+prob_report("RPSReactor", rps)
+prob_report("LOCLocal", loc)
+prob_report("Scotland_Local", scot_loc)
+prob_report("LOCLocal + Scotland_Local", loc_plus_scot)
+
+## M4
+X = patsy.dmatrix(
+    "1 + Country + Female + ln_age_years + Educ + RPS + LOC + ln_nuclear_dist_km"
+    " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+    " + trust_govt + trust_elec + climate + left_right"
+    " + LOC*ln_nuclear_dist_km",
+    data_2, return_type="dataframe")
+X = X.drop(columns="Intercept")
+names = list(X.columns)
+x_means = X.mean()
+Xc = X - x_means
+b_mu = pd.Series(0.0, index=names)
+b_sd = pd.Series(0.5 * sd_y, index=names)
+b_sd["ln_age_years"] = 0.5 * sd_y / range_age
+b_sd["ln_nuclear_dist_km"] = 0.5 * sd_y / range_dist
+for k in ["RPS[T.Reactor]", "LOC[T.Local]"]:
+    b_mu[k], b_sd[k] = -0.0625, 0.05
+with pm.Model(coords={"coef": names}) as m:
+    Intercept = pm.Normal("Intercept", mean_y, sd_y)
+    b = pm.Normal("b", mu=b_mu.values, sigma=b_sd.values, dims="coef")
+    sigma = pm.Exponential("sigma", lam=1 / sd_y)
+    mu = Intercept + pm.math.dot(Xc.values, b)
+    pm.Potential("weighted_lik",
+        (w * pm.logp(pm.Normal.dist(mu, sigma), y)).sum())
+    idata = pm.sample(draws=10000, tune=2000, chains=5, cores=5,
+        random_seed=20261008, nuts_sampler="nutpie")      
+post = idata.posterior
+b_draws = post["b"].values
+inter_draws = post["Intercept"].values
+b_Intercept = inter_draws - (b_draws * x_means.values).sum(axis=-1)
+flat = b_Intercept.ravel()
+lo, hi = np.quantile(flat, [0.025, 0.975])
+print(f"\nb[Intercept] (original scale): mean={flat.mean():.3f}  "
+      f"sd={flat.std(ddof=1):.3f}  95% ETI=({lo:.3f}, {hi:.3f})")
+print(az.summary(idata, var_names=["b", "sigma"], round_to=3, ci_prob=0.95))
+
+## M5
+X = patsy.dmatrix(
+    "1 + CountryWales + CountryNorthernIreland + Scotland_Ind_Ref + Female + ln_age_years + Educ + RPS + LOC + ln_nuclear_dist_km"
+    " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+    " + trust_govt + trust_elec + climate + left_right",
+    data_2, return_type="dataframe")
+X = X.drop(columns="Intercept")
+names = list(X.columns)
+x_means = X.mean()
+Xc = X - x_means
+b_mu = pd.Series(0.0, index=names)
+b_sd = pd.Series(0.5 * sd_y, index=names)
+b_sd["ln_age_years"] = 0.5 * sd_y / range_age
+b_sd["ln_nuclear_dist_km"] = 0.5 * sd_y / range_dist
+for k in ["RPS[T.Reactor]", "LOC[T.Local]"]:
+    b_mu[k], b_sd[k] = -0.0625, 0.05
+with pm.Model(coords={"coef": names}) as m:
+    Intercept = pm.Normal("Intercept", mean_y, sd_y)
+    b = pm.Normal("b", mu=b_mu.values, sigma=b_sd.values, dims="coef")
+    sigma = pm.Exponential("sigma", lam=1 / sd_y)
+    mu = Intercept + pm.math.dot(Xc.values, b)
+    pm.Potential("weighted_lik",
+        (w * pm.logp(pm.Normal.dist(mu, sigma), y)).sum())
+    idata = pm.sample(draws=10000, tune=2000, chains=5, cores=5,
+        random_seed=20261008, nuts_sampler="nutpie")      
+post = idata.posterior
+b_draws = post["b"].values
+inter_draws = post["Intercept"].values
+b_Intercept = inter_draws - (b_draws * x_means.values).sum(axis=-1)
+flat = b_Intercept.ravel()
+lo, hi = np.quantile(flat, [0.025, 0.975])
+print(f"\nb[Intercept] (original scale): mean={flat.mean():.3f}  "
+      f"sd={flat.std(ddof=1):.3f}  95% ETI=({lo:.3f}, {hi:.3f})")
+print(az.summary(idata, var_names=["b", "sigma"], round_to=3, ci_prob=0.95))
+
+## M6
+X = patsy.dmatrix(
+    "1 + CountryWales + CountryNorthernIreland + Scotland_Vote_2024 + Female + ln_age_years + Educ + RPS + LOC + ln_nuclear_dist_km"
+    " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+    " + trust_govt + trust_elec + climate + left_right",
+    data_2, return_type="dataframe")
+X = X.drop(columns="Intercept")
+names = list(X.columns)
+x_means = X.mean()
+Xc = X - x_means
+b_mu = pd.Series(0.0, index=names)
+b_sd = pd.Series(0.5 * sd_y, index=names)
+b_sd["ln_age_years"] = 0.5 * sd_y / range_age
+b_sd["ln_nuclear_dist_km"] = 0.5 * sd_y / range_dist
+for k in ["RPS[T.Reactor]", "LOC[T.Local]"]:
+    b_mu[k], b_sd[k] = -0.0625, 0.05
+with pm.Model(coords={"coef": names}) as m:
+    Intercept = pm.Normal("Intercept", mean_y, sd_y)
+    b = pm.Normal("b", mu=b_mu.values, sigma=b_sd.values, dims="coef")
+    sigma = pm.Exponential("sigma", lam=1 / sd_y)
+    mu = Intercept + pm.math.dot(Xc.values, b)
+    pm.Potential("weighted_lik",
+        (w * pm.logp(pm.Normal.dist(mu, sigma), y)).sum())
+    idata = pm.sample(draws=10000, tune=2000, chains=5, cores=5,
+        random_seed=20261008, nuts_sampler="nutpie")      
+post = idata.posterior
+b_draws = post["b"].values
+inter_draws = post["Intercept"].values
+b_Intercept = inter_draws - (b_draws * x_means.values).sum(axis=-1)
+flat = b_Intercept.ravel()
+lo, hi = np.quantile(flat, [0.025, 0.975])
+print(f"\nb[Intercept] (original scale): mean={flat.mean():.3f}  "
+      f"sd={flat.std(ddof=1):.3f}  95% ETI=({lo:.3f}, {hi:.3f})")
+print(az.summary(idata, var_names=["b", "sigma"], round_to=3, ci_prob=0.95))
+
+## M7
+X = patsy.dmatrix(
+    "1 + CountryWales + CountryNorthernIreland + Scotland_PID + Female + ln_age_years + Educ + RPS + LOC + ln_nuclear_dist_km"
+    " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+    " + trust_govt + trust_elec + climate + left_right",
+    data_2, return_type="dataframe")
+X = X.drop(columns="Intercept")
+names = list(X.columns)
+x_means = X.mean()
+Xc = X - x_means
+b_mu = pd.Series(0.0, index=names)
+b_sd = pd.Series(0.5 * sd_y, index=names)
+b_sd["ln_age_years"] = 0.5 * sd_y / range_age
+b_sd["ln_nuclear_dist_km"] = 0.5 * sd_y / range_dist
+for k in ["RPS[T.Reactor]", "LOC[T.Local]"]:
+    b_mu[k], b_sd[k] = -0.0625, 0.05
+with pm.Model(coords={"coef": names}) as m:
+    Intercept = pm.Normal("Intercept", mean_y, sd_y)
+    b = pm.Normal("b", mu=b_mu.values, sigma=b_sd.values, dims="coef")
+    sigma = pm.Exponential("sigma", lam=1 / sd_y)
+    mu = Intercept + pm.math.dot(Xc.values, b)
+    pm.Potential("weighted_lik",
+        (w * pm.logp(pm.Normal.dist(mu, sigma), y)).sum())
+    idata = pm.sample(draws=10000, tune=2000, chains=5, cores=5,
+        random_seed=20261008, nuts_sampler="nutpie")      
+post = idata.posterior
+b_draws = post["b"].values
+inter_draws = post["Intercept"].values
+b_Intercept = inter_draws - (b_draws * x_means.values).sum(axis=-1)
+flat = b_Intercept.ravel()
+lo, hi = np.quantile(flat, [0.025, 0.975])
+print(f"\nb[Intercept] (original scale): mean={flat.mean():.3f}  "
+      f"sd={flat.std(ddof=1):.3f}  95% ETI=({lo:.3f}, {hi:.3f})")
+print(az.summary(idata, var_names=["b", "sigma"], round_to=3, ci_prob=0.95))
+
+
+## Regression models with item non-response on DV dropped
+y = data_2a["support_smr"].to_numpy(dtype=float)
+w = data_2a["weight"].to_numpy(dtype=float)
+ds = sm.stats.DescrStatsW(y, weights=w, ddof=1)
+mean_y = ds.mean
+sd_y = np.sqrt(ds.var)
+range_age = data_2a["ln_age_years"].max() - data_2a["ln_age_years"].min()
+range_dist = data_2a["ln_nuclear_dist_km"].max() - data_2a["ln_nuclear_dist_km"].min()
+
+## M00a
+X = patsy.dmatrix(
+    "1 + RPS + LOC + RPS*LOC",
+    data_2a, return_type="dataframe")
+X = X.drop(columns="Intercept")
+names = list(X.columns)
+x_means = X.mean()
+Xc = X - x_means
+b_mu = pd.Series(0.0, index=names)
+b_sd = pd.Series(0.5 * sd_y, index=names)
+for k in ["RPS[T.Reactor]", "LOC[T.Local]"]:
+    b_mu[k], b_sd[k] = -0.0625, 0.05
+with pm.Model(coords={"coef": names}) as m:
+    Intercept = pm.Normal("Intercept", mean_y, sd_y)
+    b = pm.Normal("b", mu=b_mu.values, sigma=b_sd.values, dims="coef")
+    sigma = pm.Exponential("sigma", lam=1 / sd_y)
+    mu = Intercept + pm.math.dot(Xc.values, b)
+    pm.Potential("weighted_lik",
+        (w * pm.logp(pm.Normal.dist(mu, sigma), y)).sum())
+    idata = pm.sample(draws=10000, tune=2000, chains=5, cores=5,
+        random_seed=20261008, nuts_sampler="nutpie")      
+post = idata.posterior
+b_draws = post["b"].values
+inter_draws = post["Intercept"].values
+b_Intercept = inter_draws - (b_draws * x_means.values).sum(axis=-1)
+flat = b_Intercept.ravel()
+lo, hi = np.quantile(flat, [0.025, 0.975])
+print(f"\nb[Intercept] (original scale): mean={flat.mean():.3f}  "
+      f"sd={flat.std(ddof=1):.3f}  95% ETI=({lo:.3f}, {hi:.3f})")
+print(az.summary(idata, var_names=["b", "sigma"], round_to=3, ci_prob=0.95))
+
+## M0a
+X = patsy.dmatrix(
+    "1 + Country + Female + ln_age_years + Educ + RPS + LOC + ln_nuclear_dist_km",
+    data_2a, return_type="dataframe")
+X = X.drop(columns="Intercept")
+names = list(X.columns)
+x_means = X.mean()
+Xc = X - x_means
+b_mu = pd.Series(0.0, index=names)
+b_sd = pd.Series(0.5 * sd_y, index=names)
+b_sd["ln_age_years"] = 0.5 * sd_y / range_age
+b_sd["ln_nuclear_dist_km"] = 0.5 * sd_y / range_dist
+for k in ["RPS[T.Reactor]", "LOC[T.Local]"]:
+    b_mu[k], b_sd[k] = -0.0625, 0.05
+with pm.Model(coords={"coef": names}) as m:
+    Intercept = pm.Normal("Intercept", mean_y, sd_y)
+    b = pm.Normal("b", mu=b_mu.values, sigma=b_sd.values, dims="coef")
+    sigma = pm.Exponential("sigma", lam=1 / sd_y)
+    mu = Intercept + pm.math.dot(Xc.values, b)
+    pm.Potential("weighted_lik",
+        (w * pm.logp(pm.Normal.dist(mu, sigma), y)).sum())
+    idata = pm.sample(draws=10000, tune=2000, chains=5, cores=5,
+        random_seed=20261008, nuts_sampler="nutpie")      
+post = idata.posterior
+b_draws = post["b"].values
+inter_draws = post["Intercept"].values
+b_Intercept = inter_draws - (b_draws * x_means.values).sum(axis=-1)
+flat = b_Intercept.ravel()
+lo, hi = np.quantile(flat, [0.025, 0.975])
+print(f"\nb[Intercept] (original scale): mean={flat.mean():.3f}  "
+      f"sd={flat.std(ddof=1):.3f}  95% ETI=({lo:.3f}, {hi:.3f})")
+print(az.summary(idata, var_names=["b", "sigma"], round_to=3, ci_prob=0.95))
+
+## M1a
+X = patsy.dmatrix(
+    "1 + Country + Female + ln_age_years + Educ + RPS + LOC + ln_nuclear_dist_km"
+    " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+    " + trust_govt + trust_elec + climate + left_right",
+    data_2a, return_type="dataframe")
+X = X.drop(columns="Intercept")
+names = list(X.columns)
+x_means = X.mean()
+Xc = X - x_means
+b_mu = pd.Series(0.0, index=names)
+b_sd = pd.Series(0.5 * sd_y, index=names)
+b_sd["ln_age_years"] = 0.5 * sd_y / range_age
+b_sd["ln_nuclear_dist_km"] = 0.5 * sd_y / range_dist
+for k in ["RPS[T.Reactor]", "LOC[T.Local]"]:
+    b_mu[k], b_sd[k] = -0.0625, 0.05
+with pm.Model(coords={"coef": names}) as m:
+    Intercept = pm.Normal("Intercept", mean_y, sd_y)
+    b = pm.Normal("b", mu=b_mu.values, sigma=b_sd.values, dims="coef")
+    sigma = pm.Exponential("sigma", lam=1 / sd_y)
+    mu = Intercept + pm.math.dot(Xc.values, b)
+    pm.Potential("weighted_lik",
+        (w * pm.logp(pm.Normal.dist(mu, sigma), y)).sum())
+    idata = pm.sample(draws=10000, tune=2000, chains=5, cores=5,
+        random_seed=20261008, nuts_sampler="nutpie")      
+post = idata.posterior
+b_draws = post["b"].values
+inter_draws = post["Intercept"].values
+b_Intercept = inter_draws - (b_draws * x_means.values).sum(axis=-1)
+flat = b_Intercept.ravel()
+lo, hi = np.quantile(flat, [0.025, 0.975])
+print(f"\nb[Intercept] (original scale): mean={flat.mean():.3f}  "
+      f"sd={flat.std(ddof=1):.3f}  95% ETI=({lo:.3f}, {hi:.3f})")
+print(az.summary(idata, var_names=["b", "sigma"], round_to=3, ci_prob=0.95))
+
+for label, col in [("RPSReactor", "RPS[T.Reactor]"), ("LOCLocal", "LOC[T.Local]")]:
+    d = b_draws[..., names.index(col)].ravel()
+    print(f"{label}: P(b >= 0) = {np.mean(d >= 0):.4f}   P(b < 0) = {np.mean(d < 0):.4f}")
+
+## M2a
+X = patsy.dmatrix(
+    "1 + Country + Female + ln_age_years + Educ + RPS + LOC + ln_nuclear_dist_km"
+    " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+    " + trust_govt + trust_elec + climate + left_right"
+    " + LOC*Country",
+    data_2a, return_type="dataframe")
+X = X.drop(columns="Intercept")
+names = list(X.columns)
+x_means = X.mean()
+Xc = X - x_means
+b_mu = pd.Series(0.0, index=names)
+b_sd = pd.Series(0.5 * sd_y, index=names)
+b_sd["ln_age_years"] = 0.5 * sd_y / range_age
+b_sd["ln_nuclear_dist_km"] = 0.5 * sd_y / range_dist
+for k in ["RPS[T.Reactor]", "LOC[T.Local]"]:
+    b_mu[k], b_sd[k] = -0.0625, 0.05
+with pm.Model(coords={"coef": names}) as m:
+    Intercept = pm.Normal("Intercept", mean_y, sd_y)
+    b = pm.Normal("b", mu=b_mu.values, sigma=b_sd.values, dims="coef")
+    sigma = pm.Exponential("sigma", lam=1 / sd_y)
+    mu = Intercept + pm.math.dot(Xc.values, b)
+    pm.Potential("weighted_lik",
+        (w * pm.logp(pm.Normal.dist(mu, sigma), y)).sum())
+    idata = pm.sample(draws=10000, tune=2000, chains=5, cores=5,
+        random_seed=20261008, nuts_sampler="nutpie")      
+post = idata.posterior
+b_draws = post["b"].values
+inter_draws = post["Intercept"].values
+b_Intercept = inter_draws - (b_draws * x_means.values).sum(axis=-1)
+flat = b_Intercept.ravel()
+lo, hi = np.quantile(flat, [0.025, 0.975])
+print(f"\nb[Intercept] (original scale): mean={flat.mean():.3f}  "
+      f"sd={flat.std(ddof=1):.3f}  95% ETI=({lo:.3f}, {hi:.3f})")
+print(az.summary(idata, var_names=["b", "sigma"], round_to=3, ci_prob=0.95))
+
+for label, col in [("RPSReactor", "RPS[T.Reactor]"), ("LOCLocal", "LOC[T.Local]")]:
+    d = b_draws[..., names.index(col)].ravel()
+    print(f"{label}: P(b >= 0) = {np.mean(d >= 0):.4f}   P(b < 0) = {np.mean(d < 0):.4f}")
+
+## M3a
+X = patsy.dmatrix(
+    "1 + Country + Female + ln_age_years + Educ + RPS + LOC + ln_nuclear_dist_km"
+    " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+    " + trust_govt + trust_elec + climate + left_right"
+    " + Scotland_Local",
+    data_2a, return_type="dataframe")
+X = X.drop(columns="Intercept")
+names = list(X.columns)
+x_means = X.mean()
+Xc = X - x_means
+b_mu = pd.Series(0.0, index=names)
+b_sd = pd.Series(0.5 * sd_y, index=names)
+b_sd["ln_age_years"] = 0.5 * sd_y / range_age
+b_sd["ln_nuclear_dist_km"] = 0.5 * sd_y / range_dist
+for k in ["RPS[T.Reactor]", "LOC[T.Local]"]:
+    b_mu[k], b_sd[k] = -0.0625, 0.05
+with pm.Model(coords={"coef": names}) as m:
+    Intercept = pm.Normal("Intercept", mean_y, sd_y)
+    b = pm.Normal("b", mu=b_mu.values, sigma=b_sd.values, dims="coef")
+    sigma = pm.Exponential("sigma", lam=1 / sd_y)
+    mu = Intercept + pm.math.dot(Xc.values, b)
+    pm.Potential("weighted_lik",
+        (w * pm.logp(pm.Normal.dist(mu, sigma), y)).sum())
+    idata = pm.sample(draws=10000, tune=2000, chains=5, cores=5,
+        random_seed=20261008, nuts_sampler="nutpie")      
+post = idata.posterior
+b_draws = post["b"].values
+inter_draws = post["Intercept"].values
+b_Intercept = inter_draws - (b_draws * x_means.values).sum(axis=-1)
+flat = b_Intercept.ravel()
+lo, hi = np.quantile(flat, [0.025, 0.975])
+print(f"\nb[Intercept] (original scale): mean={flat.mean():.3f}  "
+      f"sd={flat.std(ddof=1):.3f}  95% ETI=({lo:.3f}, {hi:.3f})")
+print(az.summary(idata, var_names=["b", "sigma"], round_to=3, ci_prob=0.95))
+
+def coef_draws(name):
+    return b_draws[..., names.index(name)].ravel()
+
+rps       = coef_draws("RPS[T.Reactor]")
+loc       = coef_draws("LOC[T.Local]")
+scot_loc  = coef_draws("Scotland_Local")
+loc_plus_scot = loc + scot_loc        # = b_LOCLocal_plus_Scotland_Local in R
+
+def prob_report(label, d):
+    print(f"{label}: P(>= 0) = {np.mean(d >= 0):.4f}   P(< 0) = {np.mean(d < 0):.4f}")
+
+prob_report("RPSReactor", rps)
+prob_report("LOCLocal", loc)
+prob_report("Scotland_Local", scot_loc)
+prob_report("LOCLocal + Scotland_Local", loc_plus_scot)
+
+## M4a
+X = patsy.dmatrix(
+    "1 + Country + Female + ln_age_years + Educ + RPS + LOC + ln_nuclear_dist_km"
+    " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+    " + trust_govt + trust_elec + climate + left_right"
+    " + LOC*ln_nuclear_dist_km",
+    data_2a, return_type="dataframe")
+X = X.drop(columns="Intercept")
+names = list(X.columns)
+x_means = X.mean()
+Xc = X - x_means
+b_mu = pd.Series(0.0, index=names)
+b_sd = pd.Series(0.5 * sd_y, index=names)
+b_sd["ln_age_years"] = 0.5 * sd_y / range_age
+b_sd["ln_nuclear_dist_km"] = 0.5 * sd_y / range_dist
+for k in ["RPS[T.Reactor]", "LOC[T.Local]"]:
+    b_mu[k], b_sd[k] = -0.0625, 0.05
+with pm.Model(coords={"coef": names}) as m:
+    Intercept = pm.Normal("Intercept", mean_y, sd_y)
+    b = pm.Normal("b", mu=b_mu.values, sigma=b_sd.values, dims="coef")
+    sigma = pm.Exponential("sigma", lam=1 / sd_y)
+    mu = Intercept + pm.math.dot(Xc.values, b)
+    pm.Potential("weighted_lik",
+        (w * pm.logp(pm.Normal.dist(mu, sigma), y)).sum())
+    idata = pm.sample(draws=10000, tune=2000, chains=5, cores=5,
+        random_seed=20261008, nuts_sampler="nutpie")      
+post = idata.posterior
+b_draws = post["b"].values
+inter_draws = post["Intercept"].values
+b_Intercept = inter_draws - (b_draws * x_means.values).sum(axis=-1)
+flat = b_Intercept.ravel()
+lo, hi = np.quantile(flat, [0.025, 0.975])
+print(f"\nb[Intercept] (original scale): mean={flat.mean():.3f}  "
+      f"sd={flat.std(ddof=1):.3f}  95% ETI=({lo:.3f}, {hi:.3f})")
+print(az.summary(idata, var_names=["b", "sigma"], round_to=3, ci_prob=0.95))
+
+## M5a
+X = patsy.dmatrix(
+    "1 + CountryWales + CountryNorthernIreland + Scotland_Ind_Ref + Female + ln_age_years + Educ + RPS + LOC + ln_nuclear_dist_km"
+    " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+    " + trust_govt + trust_elec + climate + left_right",
+    data_2a, return_type="dataframe")
+X = X.drop(columns="Intercept")
+names = list(X.columns)
+x_means = X.mean()
+Xc = X - x_means
+b_mu = pd.Series(0.0, index=names)
+b_sd = pd.Series(0.5 * sd_y, index=names)
+b_sd["ln_age_years"] = 0.5 * sd_y / range_age
+b_sd["ln_nuclear_dist_km"] = 0.5 * sd_y / range_dist
+for k in ["RPS[T.Reactor]", "LOC[T.Local]"]:
+    b_mu[k], b_sd[k] = -0.0625, 0.05
+with pm.Model(coords={"coef": names}) as m:
+    Intercept = pm.Normal("Intercept", mean_y, sd_y)
+    b = pm.Normal("b", mu=b_mu.values, sigma=b_sd.values, dims="coef")
+    sigma = pm.Exponential("sigma", lam=1 / sd_y)
+    mu = Intercept + pm.math.dot(Xc.values, b)
+    pm.Potential("weighted_lik",
+        (w * pm.logp(pm.Normal.dist(mu, sigma), y)).sum())
+    idata = pm.sample(draws=10000, tune=2000, chains=5, cores=5,
+        random_seed=20261008, nuts_sampler="nutpie")      
+post = idata.posterior
+b_draws = post["b"].values
+inter_draws = post["Intercept"].values
+b_Intercept = inter_draws - (b_draws * x_means.values).sum(axis=-1)
+flat = b_Intercept.ravel()
+lo, hi = np.quantile(flat, [0.025, 0.975])
+print(f"\nb[Intercept] (original scale): mean={flat.mean():.3f}  "
+      f"sd={flat.std(ddof=1):.3f}  95% ETI=({lo:.3f}, {hi:.3f})")
+print(az.summary(idata, var_names=["b", "sigma"], round_to=3, ci_prob=0.95))
+
+## M6a
+X = patsy.dmatrix(
+    "1 + CountryWales + CountryNorthernIreland + Scotland_Vote_2024 + Female + ln_age_years + Educ + RPS + LOC + ln_nuclear_dist_km"
+    " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+    " + trust_govt + trust_elec + climate + left_right",
+    data_2a, return_type="dataframe")
+X = X.drop(columns="Intercept")
+names = list(X.columns)
+x_means = X.mean()
+Xc = X - x_means
+b_mu = pd.Series(0.0, index=names)
+b_sd = pd.Series(0.5 * sd_y, index=names)
+b_sd["ln_age_years"] = 0.5 * sd_y / range_age
+b_sd["ln_nuclear_dist_km"] = 0.5 * sd_y / range_dist
+for k in ["RPS[T.Reactor]", "LOC[T.Local]"]:
+    b_mu[k], b_sd[k] = -0.0625, 0.05
+with pm.Model(coords={"coef": names}) as m:
+    Intercept = pm.Normal("Intercept", mean_y, sd_y)
+    b = pm.Normal("b", mu=b_mu.values, sigma=b_sd.values, dims="coef")
+    sigma = pm.Exponential("sigma", lam=1 / sd_y)
+    mu = Intercept + pm.math.dot(Xc.values, b)
+    pm.Potential("weighted_lik",
+        (w * pm.logp(pm.Normal.dist(mu, sigma), y)).sum())
+    idata = pm.sample(draws=10000, tune=2000, chains=5, cores=5,
+        random_seed=20261008, nuts_sampler="nutpie")      
+post = idata.posterior
+b_draws = post["b"].values
+inter_draws = post["Intercept"].values
+b_Intercept = inter_draws - (b_draws * x_means.values).sum(axis=-1)
+flat = b_Intercept.ravel()
+lo, hi = np.quantile(flat, [0.025, 0.975])
+print(f"\nb[Intercept] (original scale): mean={flat.mean():.3f}  "
+      f"sd={flat.std(ddof=1):.3f}  95% ETI=({lo:.3f}, {hi:.3f})")
+print(az.summary(idata, var_names=["b", "sigma"], round_to=3, ci_prob=0.95))
+
+## M7a
+X = patsy.dmatrix(
+    "1 + CountryWales + CountryNorthernIreland + Scotland_PID + Female + ln_age_years + Educ + RPS + LOC + ln_nuclear_dist_km"
+    " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+    " + trust_govt + trust_elec + climate + left_right",
+    data_2a, return_type="dataframe")
+X = X.drop(columns="Intercept")
+names = list(X.columns)
+x_means = X.mean()
+Xc = X - x_means
+b_mu = pd.Series(0.0, index=names)
+b_sd = pd.Series(0.5 * sd_y, index=names)
+b_sd["ln_age_years"] = 0.5 * sd_y / range_age
+b_sd["ln_nuclear_dist_km"] = 0.5 * sd_y / range_dist
+for k in ["RPS[T.Reactor]", "LOC[T.Local]"]:
+    b_mu[k], b_sd[k] = -0.0625, 0.05
+with pm.Model(coords={"coef": names}) as m:
+    Intercept = pm.Normal("Intercept", mean_y, sd_y)
+    b = pm.Normal("b", mu=b_mu.values, sigma=b_sd.values, dims="coef")
+    sigma = pm.Exponential("sigma", lam=1 / sd_y)
+    mu = Intercept + pm.math.dot(Xc.values, b)
+    pm.Potential("weighted_lik",
+        (w * pm.logp(pm.Normal.dist(mu, sigma), y)).sum())
+    idata = pm.sample(draws=10000, tune=2000, chains=5, cores=5,
+        random_seed=20261008, nuts_sampler="nutpie")      
+post = idata.posterior
+b_draws = post["b"].values
+inter_draws = post["Intercept"].values
+b_Intercept = inter_draws - (b_draws * x_means.values).sum(axis=-1)
+flat = b_Intercept.ravel()
+lo, hi = np.quantile(flat, [0.025, 0.975])
+print(f"\nb[Intercept] (original scale): mean={flat.mean():.3f}  "
+      f"sd={flat.std(ddof=1):.3f}  95% ETI=({lo:.3f}, {hi:.3f})")
+print(az.summary(idata, var_names=["b", "sigma"], round_to=3, ci_prob=0.95))
+
+
+## Frequentist models for comparison
+m00b = smf.wls(
+    formula=("support_smr ~ RPS + LOC + RPS*LOC"),
+    data=data_2,
+    weights=data_2["weight"],
+).fit()
+print(m00b.summary())
+
+m0b = smf.wls(
+    formula=("support_smr ~ Country + Female + ln_age_years + Educ"
+             " + RPS + LOC + ln_nuclear_dist_km"),
+    data=data_2,
+    weights=data_2["weight"],
+).fit()
+print(m0b.summary())
+
+m1b = smf.wls(
+    formula=("support_smr ~ Country + Female + ln_age_years + Educ"
+             " + RPS + LOC + ln_nuclear_dist_km"
+             " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+             " + trust_govt + trust_elec + climate + left_right"),
+    data=data_2,
+    weights=data_2["weight"],
+).fit()
+print(m1b.summary())
+
+m2b = smf.wls(
+    formula=("support_smr ~ Country + Female + ln_age_years + Educ"
+             " + RPS + LOC + ln_nuclear_dist_km"
+             " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+             " + trust_govt + trust_elec + climate + left_right"
+             " + LOC*Country"),
+    data=data_2,
+    weights=data_2["weight"],
+).fit()
+print(m2b.summary())
+print(m2b.compare_f_test(m1b))
+
+m3b = smf.wls(
+    formula=("support_smr ~ Country + Female + ln_age_years + Educ"
+             " + RPS + LOC + ln_nuclear_dist_km"
+             " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+             " + trust_govt + trust_elec + climate + left_right"
+             " + Scotland_Local"),
+    data=data_2,
+    weights=data_2["weight"],
+).fit()
+print(m3b.summary())
+print(m3b.compare_f_test(m1b))
+
+m4b = smf.wls(
+    formula=("support_smr ~ Country + Female + ln_age_years + Educ"
+             " + RPS + LOC + ln_nuclear_dist_km"
+             " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+             " + trust_govt + trust_elec + climate + left_right"
+             " + LOC*ln_nuclear_dist_km"),
+    data=data_2,
+    weights=data_2["weight"],
+).fit()
+print(m4b.summary())
+print(m4b.compare_f_test(m1b))
+
+m5b = smf.wls(
+    formula=("support_smr ~ CountryWales + CountryNorthernIreland + Scotland_Ind_Ref + Female + ln_age_years + Educ"
+             " + RPS + LOC + ln_nuclear_dist_km"
+             " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+             " + trust_govt + trust_elec + climate + left_right"),
+    data=data_2,
+    weights=data_2["weight"],
+).fit()
+print(m5b.summary())
+print(m5b.compare_f_test(m1b))
+
+m6b = smf.wls(
+    formula=("support_smr ~ CountryWales + CountryNorthernIreland + Scotland_Vote_2024 + Female + ln_age_years + Educ"
+             " + RPS + LOC + ln_nuclear_dist_km"
+             " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+             " + trust_govt + trust_elec + climate + left_right"),
+    data=data_2,
+    weights=data_2["weight"],
+).fit()
+print(m6b.summary())
+print(m6b.compare_f_test(m1b))
+
+m7b = smf.wls(
+    formula=("support_smr ~ CountryWales + CountryNorthernIreland + Scotland_PID + Female + ln_age_years + Educ"
+             " + RPS + LOC + ln_nuclear_dist_km"
+             " + follow_elec + need_more_elec + elec_self_suff + elec_price_low"
+             " + trust_govt + trust_elec + climate + left_right"),
+    data=data_2,
+    weights=data_2["weight"],
+).fit()
+print(m7b.summary())
+print(m7b.compare_f_test(m1b))
