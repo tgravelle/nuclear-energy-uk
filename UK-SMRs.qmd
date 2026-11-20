@@ -1,0 +1,1011 @@
+---
+title: "Nuclear Energy in the Neighbourhood? Examining Public Support for Small Modular Reactors in the United Kingdom"
+format: 
+  html:
+    page-layout: full
+    toc: true
+    toc-depth: 4
+    toc-location: left
+    toc-expand: true
+    toc-title: "Section"
+    code-fold: true
+    code-summary: "Show code"
+editor: visual
+---
+
+## Research project description
+
+The United Kingdom faces growing demands on its electricity grid, and electricity prices have become a major cost of living issue. At the same time, the UK has made a commitment to transition away from carbon-emitting sources of energy, and to build small modular reactors (SMRs). How SMRs are described and where they are sited can prompt considerations that lead people to support or oppose them.
+
+This project asks: how supportive is the public of SMRs? Does calling SMRs *reactors* rather than *power stations* (H1), or placing them *in your local area* rather than *in the United Kingdom* (H2) shift support? Does *distance* to existing nuclear sites shape support for SMRs (H3)? Also, do local area framing effects vary across different parts of the UK (RQ1)?
+
+The core of this project is a survey-based experiment (*n* = 1,276). The experimental design was a 2x2 factorial design, where as part of the survey question wording, SMRs were either described as *reactors* or as *power stations*, and were also described as either being in the participant's *local area* or *in the United Kingdom*.
+
+In addition to these two experimental manipulations, the analysis includes a number of covariates: country (meaning England, Scotland, Wales, and Northern Ireland), basic demographics (sex, age, education), attention to/attitudes toward electricity issues, trust in the electricity industry, trust in government, climate attitudes, left-right political orientations, and proximity to existing nuclear sites.
+
+The main analyses are a set of linear models estimated in a Bayesian statistical framework using `brms` in R. As robustness checks, the same model specifications are estimated with ordinary least squares (frequentist) estimation; they are also estimated using `PyMC` and `statsmodels` in Python.
+
+## Preparing the R session
+
+Set R options and load required packages.
+
+```{r}
+#| label: prepare R session
+#| output: false
+rm(list=ls())
+options(scipen=999)
+options(width = 160)
+select <- dplyr::select
+vars <- dplyr::vars
+coalesce <- dplyr::coalesce
+
+getwd()
+
+library(tidyverse)
+library(haven)
+library(survey)
+library(brms)
+library(cmdstanr)
+library(bayesplot)
+library(expss)
+library(lavaan)
+library(weights)
+library(semTools)
+library(modelsummary)
+library(DescTools)
+library(broom.mixed)
+library(scales)
+library(ggh4x)
+library(openxlsx)
+library(kableExtra)
+```
+
+## Data prep
+
+### Read in the survey data
+
+The survey experiment was conducted with the Vox Pop Labs online panel between 7 October and 11 November 2025. The data constitute a non-probability sample, so the supplied weights combine quasi-randomization (using the Annual Population Survey as a reference probability sample) with raking on sex, age, education, country of birth, region and 2024 recalled vote to align each each experimental condition with the characteristics of the UK public.
+
+The respondent-level survey data are publicly accessible from the project's Github repo as a .csv file, and can be read into R directly:
+
+```{r}
+#| label: import data
+data.url <- paste0("https://raw.githubusercontent.com/tgravelle/",
+                   "nuclear-energy-uk/refs/heads/main/data/UK_SMR.csv")
+data.0 <- read_csv(data.url)
+rm(data.url)
+head(data.0)
+```
+
+Next, the data need to be prepared for analysis with some standard `dplyr` data carpentry. This includes reflecting (reversing) the direction of coding of survey items where necessary, recoding missing values, and setting and reordering the levels of categorical variables.
+
+```{r}
+#| label: initial recodes
+data.1 <- data.0 %>%
+  mutate(support_smr = case_when(
+    SMNR_UK %in% 1:5 | SMNP_UK %in% 1:5 | SMNR_LOCAL %in% 1:5 | SMNP_LOCAL %in% 1:5
+     ~ 6 - coalesce(SMNR_UK, SMNP_UK, SMNR_LOCAL, SMNP_LOCAL),
+    SMNR_UK == 6 | SMNP_UK == 6 | SMNR_LOCAL == 6 | SMNP_LOCAL == 6 ~ 3,
+    TRUE ~ 3
+  )) %>%
+  mutate(support_smr_nr = case_when(
+    SMNR_UK %in% 1:5 | SMNP_UK %in% 1:5 | SMNR_LOCAL %in% 1:5 | SMNP_LOCAL %in% 1:5
+     ~ 6 - coalesce(SMNR_UK, SMNP_UK, SMNR_LOCAL, SMNP_LOCAL),
+    SMNR_UK == 6 | SMNP_UK == 6 | SMNR_LOCAL == 6 | SMNP_LOCAL == 6 ~ -9,
+    TRUE ~ -9
+  )) %>%
+  mutate(RPS = fct_relevel(as_factor(RPS), "Power Station", "Reactor")) %>%
+  mutate(LOC = fct_relevel(as_factor(LOC), "UK", "Local")) %>%
+  mutate(Female = case_when(
+    GENDER == 1 ~ 0,
+    GENDER == 2 ~ 1,
+    SEX_panel == "Male" ~ 0,
+    SEX_panel == "Female" ~ 1,
+    TRUE ~ 0.5
+  )) %>%
+  mutate(ln_age_years = log(AgeYears)) %>%
+  mutate(ln_age_years = ln_age_years - weighted.mean(x = ln_age_years, w = weight)) %>%
+  mutate(ln_nuclear_dist_km = ln_nuclear_dist_km - weighted.mean(x = ln_nuclear_dist_km, w = weight)) %>%
+  mutate(ed = as_factor(case_when(
+    EDUCATION %in% c(10, 11, 12, 17, 19, -99) ~ "O-level/GCSE/None",
+    EDUCATION %in% c(7, 8) ~ "A-level",
+    EDUCATION %in% c(3, 4, 5, 6, 9, 13, 14, 15, 16, 18) ~ "HND/HNC/trade",
+    EDUCATION == 2 ~ "Bachelor degree",
+    EDUCATION == 1 ~ "Postgraduate degree",
+    TRUE ~ EDU_panel
+  ))) %>%
+  mutate(Educ = case_when(
+    ed == "O-level/GCSE/None" ~ 0,
+    ed == "A-level" ~ 0.25,
+    ed == "HND/HNC/trade" ~ 0.5,
+    ed == "Bachelor degree" ~ 0.75,
+    ed == "Postgraduate degree" ~ 1,
+    TRUE ~ 0
+  )) %>%
+  mutate(Educ = Educ - weighted.mean(x = Educ, w = weight)) %>%
+  select(-ed) %>%
+  mutate(Country = fct_relevel(COUNTRY, "England", "Wales", "Scotland", "Northern Ireland")) %>%
+  mutate(CountryWales = case_when(
+    Country == "Wales" ~ 1,
+    TRUE ~ 0
+  )) %>%
+  mutate(CountryNorthernIreland = case_when(
+    Country == "Northern Ireland" ~ 1,
+    TRUE ~ 0
+  )) %>%
+  mutate(mii_col = case_when(
+    MII == 9 ~ 1,
+    TRUE ~ 0
+  )) %>%
+  mutate(left_right = LEFT_RIGHT) %>%
+  mutate(local_econ = 6 - LOCAL_ECON) %>%
+  mutate(local_envt = 6 - LOCAL_ENVT) %>%
+  mutate(elec_envt_friendly = 6 - ELECTRICITY_1) %>%
+  mutate(need_more_elec = 6 - ELECTRICITY_2) %>%
+  mutate(elec_self_suff = 6 - ELECTRICITY_3) %>%
+  mutate(elec_price_low = 6 - ELECTRICITY_4) %>%
+  mutate(cc_problem = 6 - CLIMATE_1) %>%
+  mutate(envt_exagg_r = CLIMATE_2) %>%
+  mutate(cc_action = 6 - CLIMATE_3) %>%
+  mutate(cc_uncert_occ_r = CLIMATE_4) %>%
+  mutate(cc_uncert_eff_r = CLIMATE_5) %>%
+  mutate(follow_elec = 5 - FOLLOW_ELEC) %>%
+  mutate(trust_westminster = 5 - TRUST_1) %>%
+  mutate(trust_pm = 5 - TRUST_2) %>%
+  mutate(trust_local_mp = 5 - TRUST_3) %>%
+  mutate(trust_council = 5 - TRUST_13) %>%
+  mutate(trust_elec_cos = 5 - TRUST_14) %>%
+  mutate(trust_elec_supp = 5 - TRUST_15) %>%
+  mutate(across(c(left_right:cc_uncert_eff_r), ~ case_when(
+    .x %in% 1:5 ~ .x,
+    TRUE ~ NA_real_
+  ))) %>%
+  mutate(across(c(follow_elec:trust_elec_supp), ~ case_when(
+    .x %in% 1:4 ~ .x,
+    TRUE ~ NA_real_
+  ))) %>%
+  mutate(VOTE2024 = as_factor(case_when(
+    VOTE_2024 == 2 ~ "Labour",
+    VOTE_2024 == 1 ~ "Conservative",
+    VOTE_2024 == 3 ~ "Liberal Democrat",
+    VOTE_2024 == 13 ~ "Reform UK",
+    VOTE_2024 == 4 ~ "Scottish National Party",
+    VOTE_2024 == 6 ~ "Plaid Cymru",
+    VOTE_2024 == 10 ~ "Nationalist",
+    VOTE_2024 %in% c(8, 11, 12) ~ "Unionist",
+    VOTE_2024 == 14 ~ "Other",
+    VOTE_2024 %in% c(16, 17, 18, 19, 20) ~ "DNV",
+    TRUE ~ "DNV"
+  ))) %>%
+  mutate(VOTE2024 = fct_relevel(VOTE2024, "Labour", "Conservative", "Liberal Democrat", "Reform UK",
+                                "Scottish National Party", "Plaid Cymru", "Nationalist", "Unionist")) %>%
+  mutate(Scotland_Local = case_when(
+    Country == "Scotland" & LOC == "Local" ~ 1,
+    TRUE ~ 0
+  )) %>%
+  mutate(Scotland_Ind_Ref = as_factor(case_when(
+    Country == "Scotland" & IND_SCOTLAND == 1 ~ "Yes",
+    Country == "Scotland" ~ "Not yes",
+    TRUE ~ "Outside Scotland"
+  ))) %>%
+  mutate(Scotland_Ind_Ref = fct_relevel(Scotland_Ind_Ref, "Outside Scotland", "Yes", "Not yes")) %>%
+  mutate(Scotland_Vote_2024 = as_factor(case_when(
+    Country == "Scotland" & VOTE2024 == "Scottish National Party" ~ "Scotland-SNP",
+    Country == "Scotland" ~ "Scotland-Other",
+    TRUE ~ "Outside Scotland"
+  ))) %>%
+  mutate(Scotland_Vote_2024 = fct_relevel(Scotland_Vote_2024, "Outside Scotland", "Scotland-SNP", "Scotland-Other")) %>%
+  mutate(Scotland_PID = as_factor(case_when(
+    Country == "Scotland" & PID == 4 ~ "Scotland-SNP",
+    Country == "Scotland" ~ "Scotland-Other",
+    TRUE ~ "Outside Scotland"
+  ))) %>%
+  mutate(Scotland_PID = fct_relevel(Scotland_PID, "Outside Scotland", "Scotland-SNP", "Scotland-Other"))
+```
+
+### Check the recoded data
+
+After these data prep steps, it's important to *inspect the data* by running basic frequency distributions.
+
+```{r}
+#| label: frequencies
+xtabs(~ condition, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ condition + Country, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ RPS, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ LOC, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ support_smr, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ support_smr_nr + Female, addNA = TRUE, data = data.1)
+xtabs(~ support_smr_nr + Female, addNA = TRUE, data = data.1) %>% prop.table(margin = 2)*100
+
+xtabs(~ Female, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ Educ, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ Country, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ Country, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ CountryWales, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ CountryNorthernIreland, addNA = TRUE, na.action = NULL, data = data.1)
+
+xtabs(~ local_econ, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ local_envt, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ elec_envt_friendly, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ need_more_elec, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ elec_self_suff, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ elec_price_low, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ cc_problem, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ envt_exagg_r, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ cc_action, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ cc_uncert_occ_r, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ cc_uncert_eff_r, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ follow_elec, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ trust_westminster, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ trust_pm, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ trust_local_mp, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ trust_council, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ trust_elec_cos, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ trust_elec_supp, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ left_right, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ left_right, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ VOTE2024, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ VOTE2024, addNA = TRUE, na.action = NULL, data = data.1, subset = Country == "Scotland")
+xtabs(~ Scotland_Ind_Ref, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ Scotland_Vote_2024, addNA = TRUE, na.action = NULL, data = data.1)
+xtabs(~ Scotland_PID, addNA = TRUE, na.action = NULL, data = data.1)
+```
+
+## Validate composite measures
+
+Several of the covariates used in the regression models are composite variables comprised of multiple survey items. Validating these composite scores can be approached from multiple angles: inspecting bivariate correlations, reliability analysis (Cronbach's alpha), and confirmatory factor analysis (CFA). Given that we have weighted survey data, useful functions for this are `weights::wtd.cor`, `survey::svycralpha` and the `sampling.weights` argument in `lavaan::cfa`.
+
+The survey items measuring attitudes toward electricity issues don't cohere very well as a composite measure (low inter-item correlations, low Cronbach's alpha). These will be kept as distict measures in the regression modeling.
+
+```{r}
+#| label: inter-item correlations + reliability analysis (electricity)
+#| warning: false
+wtd.cor(x = (select(data.1, need_more_elec, elec_self_suff, elec_price_low)),
+        weight = data.1$weight) %>%
+  pluck(., "correlation")
+
+svycralpha(~need_more_elec + elec_self_suff + elec_price_low,
+           (svydesign(id = ~1, strata = ~condition, weights = ~weight, data = data.1)), na.rm = TRUE)
+```
+
+But climate attitudes make for a strong composite measure (high inter-item correlations, high Cronbach's alpha).
+
+```{r}
+#| label: inter-item correlations + reliability analysis (climate)
+#| warning: false
+wtd.cor(x = (select(data.1, cc_problem, envt_exagg_r, cc_action, cc_uncert_occ_r)),
+        weight = data.1$weight) %>%
+  pluck(., "correlation")
+
+svycralpha(~cc_problem + envt_exagg_r + cc_action + cc_uncert_occ_r,
+           (svydesign(id = ~1, strata = ~condition, weights = ~weight, data = data.1)), na.rm = TRUE)
+```
+
+Trust in government works well as a composite meaure.
+
+```{r}
+#| label: inter-item correlations + reliability analysis (trust in government)
+#| warning: false
+wtd.cor(x = (select(data.1, trust_westminster, trust_pm, trust_local_mp, trust_council)),
+        weight = data.1$weight) %>%
+  pluck(., "correlation")
+
+svycralpha(~trust_westminster + trust_pm + trust_local_mp + trust_council,
+           (svydesign(id = ~1, strata = ~condition, weights = ~weight, data = data.1)), na.rm = TRUE)
+```
+
+So does trust in electricity companies.
+
+```{r}
+#| label: inter-item correlations + reliability analysis (trust in electricity companies)
+#| warning: false
+wtd.cor(x = (select(data.1, trust_elec_cos, trust_elec_supp)),
+        weight = data.1$weight) %>%
+  pluck(., "correlation")
+
+svycralpha(~trust_elec_cos + trust_elec_supp,
+           (svydesign(id = ~1, strata = ~condition, weights = ~weight, data = data.1)), na.rm = TRUE)
+```
+
+Next, we will look at a CFA model for the three composite measures we plan to use in the regression analysis (trust in government, trust in electricity companies, and climate attitudes). This will be done using the `lavaan` package, which is very flexible, allowing for categorical indicators, weighted data, correlated errors, and fixing factor loadings to equality -- all things we want to specify our model in this case.
+
+This gives us a CFA model with excellent fit to the data (based on the CFI, TLI, RMSEA, SRMR model fit statistics) and generally high factor loadings.
+
+```{r}
+#| label: confirmatory factor analysis model
+cfa_model <-
+  '
+  trust_govt =~ NA*trust_westminster + trust_pm + trust_local_mp + trust_council
+  trust_elec =~ A*trust_elec_supp + B*trust_elec_cos
+  climate =~ NA*cc_problem + envt_exagg_r + cc_action + cc_uncert_occ_r
+  A == B
+  trust_govt ~~ 1*trust_govt
+  climate ~~ 1*climate
+  trust_local_mp ~~ trust_council
+  trust_westminster ~~ trust_pm
+  cc_problem ~~ cc_action
+'
+
+cfa_fit <- cfa(cfa_model, data = data.1, ordered = TRUE, estimator = "WLSMV", sampling.weights = "weight",
+               missing = "pairwise", parameterization = "theta", mimic = "Mplus")
+summary(cfa_fit, fit.measures = TRUE, standardized = TRUE)
+```
+
+## Extract factor scores, rescale composite measures
+
+We can use the CFA model to calculate respondent-level factor scores (to use in the regression models as covariates) using the `lavaan::lavPredict` function. We will want the factor scores (along with the other continous covariates) to be range-standardized (rescaled between 0 and 1) and then mean centred before being entered into the models. This will help with the interpretation of the results: the model intercepts will have a meaningful interpretation, namely the predicted value of the dependent variable when all categorical covariates are set to their reference values, and *all continuous variables are set to their (pre-transformation) means*.
+
+We will also range-standardize the dependent variable and subtract 0.5; this puts it on a -0.5 to +0.5 scale.
+
+A couple of helper functions `range_std` and `range_centre` simplify these variable transformations. Another `wtd_summary` function helps to sanity-check the resulting transformed variables.
+
+```{r}
+#| label: rescale covariates
+range_std <- function(x) {
+  x <- (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
+}
+
+range_centre <- function(x, w = NULL) {
+  x <- (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
+  x <- x - weighted.mean(x, w, na.rm = TRUE)
+}
+
+wtd_summary <- function(x, w, na.rm = TRUE, digits = 5) {
+  if (na.rm) {
+    valid <- !is.na(x) & !is.na(w)
+    x <- x[valid]
+    w <- w[valid]
+  }
+  qt <- Hmisc::wtd.quantile(x, w, probs = c(0, .25, .5, .75, 1))
+  m <- Hmisc::wtd.mean(x, w)
+  out <- c(qt[1:3], Mean = m, qt[4:5])
+  names(out) <- c("Min.", "1st Qu.", "Median", "Mean", "3rd Qu.", "Max.")
+  round(out, digits)
+}
+
+data.2 <- data.1 %>%
+  bind_cols(., (lavPredict(object = cfa_fit, type = "lv", method = "EBM", append.data = FALSE) %>%
+                  as.data.frame() %>% as_tibble())) %>%
+  mutate(support_smr = range_std(x = support_smr) - 0.5) %>%
+  mutate(follow_elec = case_when(follow_elec %in% 1:4 ~ follow_elec, TRUE ~ 1)) %>%
+  mutate(follow_elec = range_centre(x = follow_elec, w = weight)) %>%
+  mutate(need_more_elec = case_when(need_more_elec %in% 1:5 ~ need_more_elec, TRUE ~ 3)) %>%
+  mutate(need_more_elec = range_centre(x = need_more_elec, w = weight)) %>%
+  mutate(elec_self_suff = case_when(elec_self_suff %in% 1:5 ~ elec_self_suff, TRUE ~ 3)) %>%
+  mutate(elec_self_suff = range_centre(x = elec_self_suff, w = weight)) %>%
+  mutate(elec_price_low = case_when(elec_price_low %in% 1:5 ~ elec_price_low, TRUE ~ 3)) %>%
+  mutate(elec_price_low = range_centre(x = elec_price_low, w = weight)) %>%
+  mutate(local_econ = case_when(local_econ %in% 1:5 ~ local_econ, TRUE ~ 3)) %>%
+  mutate(local_econ = range_centre(x = local_econ, w = weight)) %>%
+  mutate(local_envt = case_when(local_envt %in% 1:5 ~ local_envt, TRUE ~ 3)) %>%
+  mutate(local_envt = range_centre(x = local_envt, w = weight)) %>%
+  mutate(trust_govt = range_centre(x = trust_govt, w = weight)) %>%
+  mutate(trust_elec = range_centre(x = trust_elec, w = weight)) %>%
+  mutate(climate = range_centre(x = climate, w = weight)) %>%
+  mutate(left_right = case_when(left_right %in% 1:5 ~ left_right, TRUE ~ 3)) %>%
+  mutate(left_right = range_centre(x = left_right, w = weight))
+```
+
+```{r}
+#| label: check covariates
+wtd_summary(data.2$support_smr, data.2$weight)
+wtd_summary(data.2$ln_age_years, data.2$weight)
+wtd_summary(data.2$follow_elec, data.2$weight)
+wtd_summary(data.2$need_more_elec, data.2$weight)
+wtd_summary(data.2$elec_self_suff, data.2$weight)
+wtd_summary(data.2$elec_price_low, data.2$weight)
+wtd_summary(data.2$local_econ, data.2$weight)
+wtd_summary(data.2$local_envt, data.2$weight)
+wtd_summary(data.2$trust_govt, data.2$weight)
+wtd_summary(data.2$trust_elec, data.2$weight)
+wtd_summary(data.2$climate, data.2$weight)
+wtd_summary(data.2$left_right, data.2$weight)
+wtd_summary(data.2$ln_nuclear_dist_km, data.2$weight)
+```
+
+## Bayesian regression models
+
+Now we're finally ready to run some models! The setup for the Bayesian models requires us to specify some priors. Covariate priors are weakly informative. The effects of *reactor* and *local* experimental treatments get small negative priors (mean −0.0625, SD 0.05), reflecting H1, H2 and prior experiments showing lower support for nearby plants.
+
+```{r}
+#| label: model priors
+mean_y <- weighted.mean(x = data.2$support_smr, weights = data.2$weight, na.rm = TRUE)
+sd_y <- sqrt(Hmisc::wtd.var(data.2$support_smr, weights = data.2$weight, na.rm = TRUE))
+range_age <- max(data.2$ln_age_years) - min(data.2$ln_age_years)
+range_dist <- max(data.2$ln_nuclear_dist_km) - min(data.2$ln_nuclear_dist_km)
+
+priors <- c(set_prior(sprintf("normal(%f, %f)", mean_y, sd_y), class = "Intercept"),
+            set_prior(sprintf("normal(0, %f)", 0.5 * sd_y), class = "b"),
+            set_prior(sprintf("exponential(%f)", 1 / sd_y), class = "sigma"),
+            set_prior(sprintf("normal(0, %f)", (0.5 * sd_y) / range_age), class = "b", coef = "ln_age_years"),
+            set_prior(sprintf("normal(0, %f)", (0.5 * sd_y) / range_dist), class = "b", coef = "ln_nuclear_dist_km"),
+            set_prior("normal(-0.0625, 0.05)", class = "b", coef = "RPSReactor"),
+            set_prior("normal(-0.0625, 0.05)", class = "b", coef = "LOCLocal"))
+```
+
+The models are estimated using the `brms::brm` function, which calls Stan from within R. The model options specify 5 chains, 2,000 warmup iterations, and 10,000 post-warmup iterations for each chain (so 50,000 post-warmup iterations overall). `cmdstanr` is used as the model back-end, as the default `rstan` back-end is quite a bit slower
+
+### Baseline model
+
+For a baseline model (`m0`), we include the *reactor*/*power station* and *local*/*United Kingdom* along with country, demographics, and distance to the nearest nuclear site as covariates.
+
+```{r}
+#| label: m0
+#| output: false
+m0 <- brm(formula = support_smr | weights(weight) ~ Country + Female + ln_age_years + Educ
+          + RPS + LOC + ln_nuclear_dist_km,
+          data = data.2,
+          family = gaussian,
+          prior = priors,
+          backend = "cmdstanr",
+          chains = 5,
+          cores = 5,
+          threads = 3,
+          iter = 12000,
+          warmup = 2000,
+          refresh = 1000,
+          seed = 20261008,
+          save_pars = save_pars(all = TRUE))
+m0 <- add_criterion(m0, "loo")
+```
+
+This shows small negative effects of the *reactor* and *local* treatments on support for SMRs, as expected. Support is also appreciably lower in Scotland compated to England. We also see that support tends to increase as distance to a nuclear site increases -- or conversely, support decreases with proximity to a nuclear site, suggesting a "NIMBY" dynamic.
+
+```{r}
+#| label: print m0
+print(m0, digits = 3)
+```
+
+### Adding more covariates
+
+We add the full set of covariates in `m1`.
+
+```{r}
+#| label: m1
+#| output: false
+m1 <- brm(formula = support_smr | weights(weight) ~ Country + Female + ln_age_years + Educ
+          + RPS + LOC + ln_nuclear_dist_km
+          + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right,
+          data = data.2,
+          family = gaussian,
+          prior = priors,
+          backend = "cmdstanr",
+          chains = 5,
+          cores = 5,
+          threads = 3,
+          iter = 12000,
+          warmup = 2000,
+          refresh = 1000,
+          seed = 20261008,
+          save_pars = save_pars(all = TRUE))
+m1 <- add_criterion(m1, "loo")
+```
+
+Not surprisingly, following news about electricity, agreeing that the UK needs to produce a lot more electricity, trust in electricity companies, climate attitudes, and left-right ideological orientations all shape attitudes toward SMRs. Their inclusion in the model also reduces the estimated effect of the *reactor* treatment, suggesting that there is some attitudinal imbalance across the experimental arms.
+
+```{r}
+#| label: print m1
+print(m1, digits = 3)
+
+posterior_m1 <- as_draws_df(m1)
+mean(posterior_m1$b_RPSReactor >= 0)
+mean(posterior_m1$b_RPSReactor < 0)
+mean(posterior_m1$b_LOCLocal >= 0)
+mean(posterior_m1$b_LOCLocal < 0)
+```
+
+### Interacting the *local* vs. *UK* treatment and country
+
+We can test for heterogeneous treatment effects by including a `LOC*Country` interaction in `m2`.
+
+```{r}
+#| label: m2
+#| output: false
+m2 <- brm(formula = support_smr | weights(weight) ~ Country + Female + ln_age_years + Educ
+          + RPS + LOC + ln_nuclear_dist_km
+          + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right
+          + LOC*Country,
+          data = data.2,
+          family = gaussian,
+          prior = priors,
+          backend = "cmdstanr",
+          chains = 5,
+          cores = 5,
+          threads = 3,
+          iter = 12000,
+          warmup = 2000,
+          refresh = 1000,
+          seed = 20261008,
+          save_pars = save_pars(all = TRUE))
+m2 <- add_criterion(m2, "loo")
+```
+
+This yields an interesting finding: most of the reduced support in Scotland is due to the *local* treatment. There is no evidence of a different *local* effect in Wales or Northern Ireland.
+
+```{r}
+#| label: print m2
+print(m2, digits = 3)
+
+bayes_factor(m2, m1)
+loo_compare(m1, m2)
+posterior_m2 <- as_draws_df(m2)
+mean(posterior_m2$b_LOCLocal < 0)
+```
+
+### The *local* vs. *UK* treatment in Scotland vs. the rest of the UK
+
+Given that it is only the `CountryScotland:LOCLocal` higher-order interaction term that is appreciably different from zero, we can respecify the model to have a common slope for `LOCLocal` for England, Wales, and Northern Ireland and a different slope in Scotland in `m3`. This is done by replacing the `LOC*Country` term with `Scotland_Local`.
+
+```{r}
+#| label: m3
+#| output: false
+m3 <- brm(formula = support_smr | weights(weight) ~ Country + Female + ln_age_years + Educ
+          + RPS + LOC + ln_nuclear_dist_km
+          + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right
+          + Scotland_Local,
+          data = data.2,
+          family = gaussian,
+          prior = priors,
+          backend = "cmdstanr",
+          chains = 5,
+          cores = 5,
+          threads = 3,
+          iter = 12000,
+          warmup = 2000,
+          refresh = 1000,
+          seed = 20261008,
+          save_pars = save_pars(all = TRUE))
+m3 <- add_criterion(m3, "loo")
+```
+
+The results from `m3` reconfirm what we saw with `m2`: the negative response in Scotland to the *local* treatment is appreciably larger than in the rest of the UK.
+
+```{r}
+#| label: print m3
+print(m3, digits = 3)
+
+bayes_factor(m3, m1)
+loo_compare(m1, m3)
+posterior_m3 <- as_draws_df(m3)
+posterior_m3$b_LOCLocal_plus_Scotland_Local <- posterior_m3$b_LOCLocal + posterior_m3$b_Scotland_Local
+mean(posterior_m3$b_Scotland_Local >= 0)
+mean(posterior_m3$b_Scotland_Local < 0)
+mean(posterior_m3$b_LOCLocal + posterior_m3$b_Scotland_Local < 0)
+```
+
+## Data visualizations
+
+A convenient, compact way of summarizing a set of regression models is to display them graphically in a *coefficient plot*. This depicts both the estimated effects as well as their credibility intervals.
+
+Across Models 1–3 the experimental effects are small and stable, while the Scotland gap is far larger. Climate concern is negatively associated with support despite nuclear’s low-carbon profile, consistent with prior work and a reminder that the SMR coalition may not automatically include the most climate-concerned. Lines are 95% credible intervals; the reactor interval just touches zero.
+
+```{r}
+#| warning: false
+#| label: prepare coefficient plot data
+coef.ci.m1 <- m1 %>%
+  broom.mixed::tidy(., conf.int = TRUE) %>%
+  filter(effect == "fixed") %>%
+  bind_rows(., tribble(~term, "England (ref.)", "Power station frame (ref.)", "UK frame (ref.)")) %>%
+  mutate(model.name = "Model 1") %>%
+  mutate(reference = case_when(
+    is.na(estimate) == TRUE ~ "Baseline category",
+    TRUE ~ "Non-baseline category"
+  )) %>%
+  mutate(estimate = case_when(
+    reference == "Baseline category" ~ 0,
+    TRUE ~ estimate
+  )) %>%
+  mutate(std.error = case_when(
+    TRUE ~ std.error
+  )) %>%
+  mutate(UCL = case_when(
+    reference == "Baseline category" ~ 0,
+    TRUE ~ conf.high
+  )) %>%
+  mutate(LCL = case_when(
+    reference == "Baseline category" ~ 0,
+    TRUE ~ conf.low
+  )) %>%
+  select(model.name, term, estimate, LCL, UCL, reference)
+
+coef.ci.m2 <- m2 %>%
+  broom.mixed::tidy(., conf.int = TRUE) %>%
+  filter(effect == "fixed") %>%
+  bind_rows(., tribble(~term, "England (ref.)", "Power station frame (ref.)", "UK frame (ref.)")) %>%
+  mutate(model.name = "Model 2") %>%
+  mutate(reference = case_when(
+    is.na(estimate) == TRUE ~ "Baseline category",
+    TRUE ~ "Non-baseline category"
+  )) %>%
+  mutate(estimate = case_when(
+    reference == "Baseline category" ~ 0,
+    TRUE ~ estimate
+  )) %>%
+  mutate(std.error = case_when(
+    TRUE ~ std.error
+  )) %>%
+  mutate(UCL = case_when(
+    reference == "Baseline category" ~ 0,
+    TRUE ~ conf.high
+  )) %>%
+  mutate(LCL = case_when(
+    reference == "Baseline category" ~ 0,
+    TRUE ~ conf.low
+  )) %>%
+  select(model.name, term, estimate, LCL, UCL, reference)
+  
+coef.ci.m3 <- m3 %>%
+  broom.mixed::tidy(., conf.int = TRUE) %>%
+  filter(effect == "fixed") %>%
+  bind_rows(., tribble(~term, "England (ref.)", "Power station frame (ref.)", "UK frame (ref.)")) %>%
+  mutate(model.name = "Model 3") %>%
+  mutate(reference = case_when(
+    is.na(estimate) == TRUE ~ "Baseline category",
+    TRUE ~ "Non-baseline category"
+  )) %>%
+  mutate(estimate = case_when(
+    reference == "Baseline category" ~ 0,
+    TRUE ~ estimate
+  )) %>%
+  mutate(std.error = case_when(
+    TRUE ~ std.error
+  )) %>%
+  mutate(UCL = case_when(
+    reference == "Baseline category" ~ 0,
+    TRUE ~ conf.high
+  )) %>%
+  mutate(LCL = case_when(
+    reference == "Baseline category" ~ 0,
+    TRUE ~ conf.low
+  )) %>%
+  select(model.name, term, estimate, LCL, UCL, reference)
+
+coef.ci.support <- bind_rows(coef.ci.m1, coef.ci.m2, coef.ci.m3) %>% 
+  mutate(model.name = as_factor(model.name)) %>%
+  mutate(model.name = fct_relevel(model.name, "Model 3", "Model 2", "Model 1")) %>%
+  mutate(coef.label = as_factor(case_when(
+    term == "(Intercept)" ~ "Intercept",
+    term == "ln_age_years" ~ "Age (years logged)",
+    term == "Educ" ~ "Education",
+    term == "CountryWales" ~ "Wales",
+    term == "CountryScotland" ~ "Scotland",
+    term == "CountryNorthernIreland" ~ "N. Ireland",
+    term == "RPSReactor" ~ "Reactor frame",
+    term == "LOCLocal" ~ "Local area frame",
+    term == "ln_nuclear_dist_km" ~ "Distance to nuclear site\n(km logged)",
+    term == "follow_elec" ~ "Follow news about\nelectricity in UK",
+    term == "need_more_elec" ~ "Need to produce a lot\nmore electricity",
+    term == "elec_self_suff" ~ "UK should be self-sufficient\nin electricity",
+    term == "elec_price_low" ~ "Critical to keep price of\nelectricity in UK low",
+    term == "trust_govt" ~ "Trust in government",
+    term == "trust_elec" ~ "Trust in electricity industry",
+    term == "climate" ~ "Climate concern",
+    term == "left_right" ~ "Ideology (left-right)",
+    term == "CountryWales:LOCLocal" ~ paste0("Wales ", "\u00D7", " Local area frame"),
+    term %in% c("CountryScotland:LOCLocal", "Scotland_Local") ~ paste0("Scotland ", "\u00D7", " Local area frame"),
+    term == "CountryNorthernIreland:LOCLocal" ~ paste0("N. Ireland ", "\u00D7", " Local area frame"),
+    TRUE ~ term
+  ))) %>%
+  filter(is.na(coef.label) == FALSE) %>%
+  mutate(coef.label = fct_relevel(coef.label,
+                                  "Intercept",
+                                  "Power station frame (ref.)", "Reactor frame",
+                                  "UK frame (ref.)", "Local area frame",
+                                  "England (ref.)", "Scotland", "Wales", "N. Ireland",
+                                  "Distance to nuclear site\n(km logged)",
+                                  "Female", "Age (years logged)", "Education",
+                                  "Follow news about\nelectricity in UK", "Need to produce a lot\nmore electricity",
+                                  "UK should be self-sufficient\nin electricity", "Critical to keep price of\nelectricity in UK low",
+                                  "Climate concern", "Trust in government", "Trust in electricity industry",
+                                  "Ideology (left-right)",
+                                  "Scotland × Local area frame",
+                                  "Wales × Local area frame",
+                                  "N. Ireland × Local area frame"
+  )) %>%
+  mutate(pt.shape = case_when(
+    model.name == "Model 1" & reference == "Baseline category" ~ 21,
+    model.name == "Model 1" ~ 16,
+    model.name == "Model 2" & reference == "Baseline category" ~ 22,
+    model.name == "Model 2" ~ 15,
+    model.name == "Model 3" & reference == "Baseline category" ~ 23,
+    model.name == "Model 3" ~ 18
+  )) %>%
+  mutate(pt.fill = case_when(
+    reference == "Baseline category" ~ "white"
+  )) %>%
+  mutate(pt.size = case_when(
+    model.name == "Model 3" & reference == "Baseline category" ~ 0.45,
+    model.name == "Model 1" ~ 0.5,
+    model.name == "Model 2" ~ 0.5,
+    model.name == "Model 3" ~ 0.65
+  ))
+```
+
+```{r}
+#| label: coefficient plot
+#| fig-cap: "Coefficient plot"
+#| fig-height: 6
+ggplot(data = coef.ci.support, aes(x = estimate, y = coef.label, colour = model.name)) +
+  geom_vline(xintercept = 0, colour = "grey72", linewidth = 0.5, linetype = "longdash") +
+  geom_pointrange(aes(x = estimate, y = coef.label, xmin = LCL, xmax = UCL, colour = model.name),
+                  shape = coef.ci.support$pt.shape, size = coef.ci.support$pt.size,
+                  fill = coef.ci.support$pt.fill, stroke = 0.4,
+                  position = position_dodge(0.75)) +
+  scale_color_manual(values = c("grey60", "grey48", "grey32")) +
+  labs(x = "Estimate", y = "") +
+  scale_y_discrete(limits = rev(levels(coef.ci.support$coef.label))) +
+  coord_cartesian(xlim = c(-0.4, 0.4)) +
+  scale_x_continuous(breaks = seq(-0.4, 0.4, by = 0.2)) +
+  guides(colour = guide_legend(override.aes = list(shape = c(16,15,18), size = c(0.5,0.5,0.6)), reverse = TRUE)) +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        axis.text.x = element_text(size = 9, colour = "black"), 
+        axis.text.y = element_text(size = 8, colour = "black"),
+        text = element_text(size = 9, colour = "black"),
+        legend.title = element_blank(),
+        legend.position = c(0.14, 0.94),
+        legend.text = element_text(size = 9, colour = "black"))
+```
+
+We can also translate the results into predicted values of the dependent variable, looking at one experimental treatment at a time. Here, this shows that the *reactor* versus *power station* framing has only a very slight effect on support for SMRs. Support is favourable in all four nations regardless of *reactor* or *power station* terminology.
+
+```{r}
+#| label: prepare reactor vs. power station effect plot data
+score_reactor <- c("England", "Scotland", "Wales", "Northern Ireland") %>%
+  as_tibble() %>%
+  mutate(Country = as_factor(value)) %>%
+  select(-value) %>%
+  crossing(as_tibble(c("Power Station", "Reactor"))) %>%
+  mutate(RPS = as_factor(value)) %>%
+  select(-value) %>%
+  mutate(Female = 1,
+         ln_age_years = 0,
+         Educ = 0,
+         LOC = "UK",
+         ln_nuclear_dist_km = 0,
+         follow_elec = 0,
+         need_more_elec = 0,
+         elec_self_suff = 0,
+         elec_price_low = 0,
+         trust_govt = 0,
+         trust_elec = 0,
+         climate = 0,
+         left_right = 0,
+         Scotland_Local = 0)
+
+pred.country.reactor <- fitted(m3, score_reactor, probs = c(0.085, 0.915), cores = 12) %>%
+  as_tibble() %>%
+  bind_cols(., score_reactor) %>%
+  rename(LCL = Q8.5,
+         UCL = Q91.5) %>%
+  mutate(Country = fct_relevel(Country, "England", "Scotland", "Wales", "Northern Ireland")) %>%
+  select(Country, RPS, Estimate, Est.Error, LCL, UCL)
+print(pred.country.reactor, digits = 3)
+```
+
+```{r}
+#| label: reactor vs. power station effect plot
+#| fig-cap: "Effect plot: reactor vs. power station frame, by country"
+ggplot(data = pred.country.reactor, aes(x = RPS, y = Estimate, fill = RPS)) +
+  geom_bar(aes(y = Estimate+0.5), stat = "identity", width = 0.6, position = position_dodge(0.75)) +
+  scale_fill_manual(values = c("Power Station" = "grey84", "Reactor" = "grey30")) +
+  geom_errorbar(aes(ymin = LCL+0.5, ymax = UCL+0.5),
+                position = position_dodge(0.75), width = 0.3, colour = "black", linewidth = 0.4) +
+  labs(y = "Support for SMRs",
+       x = "") +
+  coord_cartesian(ylim = c(0, 1)) +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.25), expand = c(0,0),
+                     labels = c("Strongly\noppose", "", "", "", "Strongly\nsupport")) +
+  facet_wrap(~ Country, ncol = 2, axes = "all", scales = "fixed") +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        panel.spacing = unit(1.5, "lines"),
+        axis.text = element_text(size = 9, colour = "black"),
+        axis.title.y = element_text(margin = margin(t = 0, r = 25, b = 0, l = 10), color = "black"),
+        axis.title.x = element_text(margin = margin(t = 10, r = 0, b = 0, l = 0)),
+        strip.text.x = element_text(size = 10, colour = "black"),
+        legend.position = "none")
+```
+
+Also, th *local* versus *United Kingdom* framing has only a modest effect on support for SMRs in England, Wales, and Northern Ireland, but the effect of *local* framing is substantively large in Scotland. This points to a heterogeneous treatment effect.
+
+```{r}
+#| label: prepare local vs. UK effect plot data
+score_uk_local <- c("England", "Scotland", "Wales", "Northern Ireland") %>%
+  as_tibble() %>%
+  mutate(Country = as_factor(value)) %>%
+  select(-value) %>%
+  crossing(as_tibble(c("UK", "Local"))) %>%
+  mutate(LOC = as_factor(value)) %>%
+  select(-value) %>%
+  mutate(Female = 1,
+         ln_age_years = 0,
+         Educ = 0,
+         RPS = "Power Station",
+         ln_nuclear_dist_km = 0,
+         follow_elec = 0,
+         need_more_elec = 0,
+         elec_self_suff = 0,
+         elec_price_low = 0,
+         trust_govt = 0,
+         trust_elec = 0,
+         climate = 0,
+         left_right = 0) %>%
+  mutate(Scotland_Local = case_when(
+    Country == "Scotland" & LOC == "Local" ~ 1,
+    TRUE ~ 0))
+
+pred.country.local <- fitted(m3, score_uk_local, probs = c(0.085, 0.915), cores = 12) %>%
+  as_tibble() %>%
+  bind_cols(., score_uk_local) %>%
+  rename(LCL = Q8.5,
+         UCL = Q91.5) %>%
+  mutate(Country = fct_relevel(Country, "England", "Scotland", "Wales", "Northern Ireland")) %>%
+  mutate(LOC = as_factor(case_when(
+    LOC == "UK" ~ "UK",
+    LOC == "Local" ~ "Local area"
+  ))) %>%
+  mutate(LOC = fct_relevel(LOC, "UK", "Local area")) %>%
+  select(Country, LOC, Estimate, Est.Error, LCL, UCL)
+print(pred.country.local, digits = 3)
+```
+
+```{r}
+#| label: local vs. UK effect plot
+#| fig-cap: "Effect plot: local vs. UK frame, by country"
+ggplot(data = pred.country.local, aes(x = LOC, y = Estimate, fill = LOC)) +
+  geom_bar(aes(y = Estimate+0.5), stat = "identity", width = 0.6, position = position_dodge(0.75)) +
+  scale_fill_manual(values = c("UK" = "grey84", "Local area" = "grey30")) +
+  geom_errorbar(aes(ymin = LCL+0.5, ymax = UCL+0.5), position = position_dodge(0.75), width = 0.3, colour = "black", linewidth = 0.4) +
+  labs(y = "Support for SMRs",
+       x = "") +
+  coord_cartesian(ylim = c(0, 1)) +
+  scale_y_continuous(breaks = seq(0, 1, by = 0.25), expand = c(0,0),
+                     labels = c("Strongly\noppose", "", "", "", "Strongly\nsupport")) +
+  facet_wrap(~ Country, ncol = 2, axes = "all", scales = "fixed") +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black"),
+        panel.spacing = unit(1.5, "lines"),
+        axis.text = element_text(size = 9, colour = "black"),
+        axis.title.y = element_text(margin = margin(t = 0, r = 25, b = 0, l = 10), color = "black"),
+        axis.title.x = element_text(margin = margin(t = 10, r = 0, b = 0, l = 0)),
+        strip.text.x = element_text(size = 10, colour = "black"),
+        legend.position = "none")
+```
+
+Given that the data include continuous distance (in kilometres logged) to the nearest nuclear site, we can depict this relationship effectively with a logged X-axis. The rug shows few respondents within a few kilometres, so any effect of close proximity should be seen as tentative.
+
+```{r}
+#| label: prepare distance effect plot data
+score_dist <- as_tibble(seq(from = 0.1, to = 20, by = 0.1)) %>%
+  bind_rows(as_tibble(seq(from = 21, to = 600, by = 1))) %>%
+  rename(nuclear_dist_km = value) %>%
+  mutate(ln_nuclear_dist_km = log(nuclear_dist_km) - weighted.mean(x = data.0$ln_nuclear_dist_km, w = data.0$weight)) %>%
+  crossing(as_tibble(c("UK", "Local"))) %>%
+  mutate(LOC = as_factor(value)) %>%
+  select(-value) %>%
+  crossing(as_tibble(c("England", "Scotland"))) %>%
+  mutate(Country = as_factor(value)) %>%
+  select(-value) %>%
+  mutate(Female = 1,
+         ln_age_years = 0,
+         Educ = 0,
+         RPS = "Power Station",
+         follow_elec = 0,
+         need_more_elec = 0,
+         elec_self_suff = 0,
+         elec_price_low = 0,
+         trust_govt = 0,
+         trust_elec = 0,
+         climate = 0,
+         left_right = 0) %>%
+  mutate(Scotland_Local = case_when(
+    Country == "Scotland" & LOC == "Local" ~ 1,
+    TRUE ~ 0
+  ))
+
+pred.country.dist.uk.local <- fitted(m3, score_dist, probs = c(0.085, 0.915), cores = 12) %>%
+  as_tibble() %>%
+  bind_cols(., score_dist) %>%
+  rename(LCL = Q8.5,
+         UCL = Q91.5) %>%
+  mutate(Country = fct_relevel(as_factor(Country), "England", "Scotland")) %>%
+  mutate(UK_Local = as_factor(case_when(
+    LOC == "UK" ~ "UK",
+    LOC == "Local" ~ "Local area"
+  ))) %>%
+  mutate(UK_Local = fct_relevel(UK_Local, "UK", "Local area")) %>%
+  mutate(Country_UK_Local = str_c(Country, "–", UK_Local, " frame")) %>%
+  mutate(Country_UK_Local = fct_relevel(Country_UK_Local, "England–UK frame", "England–Local area frame",
+                                        "Scotland–UK frame","Scotland–Local area frame")) %>%
+  arrange(Country_UK_Local, nuclear_dist_km)
+  
+pred.country.dist.uk.local %>%
+  filter(UK_Local == "Local area" & nuclear_dist_km %in% c(10, 50, 100, 200)) %>%
+  select(Country, nuclear_dist_km, Estimate, Est.Error, LCL, UCL)
+
+data.rug <- data.2 %>%
+  filter(Country %in% c("England", "Scotland")) %>%
+  mutate(UK_Local = as_factor(case_when(
+    LOC == "UK" ~ "UK",
+    LOC == "Local" ~ "Local area"
+  ))) %>%
+  mutate(Country_UK_Local = str_c(Country, "–", UK_Local, " frame")) %>%
+  mutate(Country_UK_Local = fct_relevel(Country_UK_Local, "England–UK frame", "England–Local area frame",
+                                        "Scotland–UK frame","Scotland–Local area frame")) %>%
+  select(ResponseId, Country, UK_Local, Country_UK_Local, nuclear_dist_km)
+```
+
+```{r}
+#| fig-cap: "Effect plot: distance to nuclear site, by country"
+ggplot(data = pred.country.dist.uk.local, aes(y = Estimate+0.5, x = nuclear_dist_km, linetype = UK_Local)) +
+  geom_line(aes(y = Estimate+0.5), linewidth = 0.5) +
+  geom_ribbon(aes(ymin = LCL+0.5, ymax = UCL+0.5), alpha = 0.1) +
+  geom_rug(data = data.rug, aes(x = nuclear_dist_km), sides = "b", alpha = 0.4, linewidth = 0.4, inherit.aes = FALSE) +
+  labs(y = "Support for SMRs",
+       x = "Distance to nuclear site") +
+  coord_cartesian(xlim = c(4.5, 500), ylim = c(0, 1)) +
+  scale_x_continuous(trans = "log", breaks = c(5, 10, 20, 50, 100, 200, 500), labels = label_number()) +
+  scale_linetype_manual(values = c("UK" = "solid", "Local area" = "dashed")) + 
+  scale_y_continuous(breaks = seq(0, 1, by = 0.25), expand = c(0,0),
+                     labels = c("Strongly\noppose", "", "", "", "Strongly\nsupport")) +
+  facet_wrap(~ Country, ncol = 2, axes = "all", scales = "fixed") +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(),
+        panel.spacing = unit(1.5, "lines"),
+        axis.text = element_text(size = 9, colour = "black"),
+        axis.line = element_line(colour = "black"),
+        axis.ticks = element_line(colour = "black"),
+        axis.title.y = element_text(margin = margin(t = 0, r = 10, b = 0, l = 25), color = "black"),
+        axis.title.x = element_text(margin = margin(t = 10, r = 0, b = 0, l = 0)),
+        strip.text.x = element_text(size = 10, colour = "black"),
+        axis.line.x.top = element_line(color = "black"),
+        axis.ticks.x.top = element_line(color = "black"),
+        axis.text.x.top = element_text(color = "black"),
+        legend.title = element_blank(),
+        legend.position = c(0.125, 0.225),
+        legend.text = element_text(size = 9, colour = "black"))
+```
+
+## Robustness check 1: frequentist models using `stats::lm`
+
+Running conventional (frequentist) OLS models using `stats::lm` gives us substantively the same results as the Bayesian models.
+
+```{r}
+#| label: print m0b
+m0b <- lm(support_smr ~ Country + Female + ln_age_years + Educ
+          + RPS + LOC + ln_nuclear_dist_km,
+          data = data.2, weights = weight)
+tidy(m0b)
+```
+
+```{r}
+#| label: print m1b
+m1b <- lm(support_smr ~ Country + Female + ln_age_years + Educ
+          + RPS + LOC + ln_nuclear_dist_km
+          + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right,
+          data = data.2, weights = weight)
+tidy(m1b)
+```
+
+```{r}
+#| label: print m2b
+m2b <- lm(support_smr ~ Country + Female + ln_age_years + Educ
+          + RPS + LOC + ln_nuclear_dist_km
+          + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right
+          + LOC*Country,
+          data = data.2, weights = weight)
+print(tidy(m2b), n = 50)
+anova(m1b, m2b, test = "F")
+```
+
+```{r}
+#| label: print m3b
+m3b <- lm(support_smr ~ Country + Female + ln_age_years + Educ
+          + RPS + LOC + ln_nuclear_dist_km
+          + follow_elec + need_more_elec + elec_self_suff + elec_price_low + trust_govt + trust_elec + climate + left_right
+          + Scotland_Local,
+          data = data.2, weights = weight)
+print(tidy(m3b), n = 50)
+anova(m1b, m3b, test = "F")
+```
