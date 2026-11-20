@@ -10,6 +10,7 @@ format:
     toc-title: "Section"
     code-fold: true
     code-summary: "Show code"
+    embed-resources: true
 editor: visual
 ---
 

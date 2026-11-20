@@ -10,8 +10,10 @@ format:
     toc-title: "Section"
     code-fold: true
     code-summary: "Show code"
+    embed-resources: true
 editor: visual
 ---
+
 ## Robustness check 2: Bayesian models estimated in Python using `PyMC`
 
 Re-running the Bayesian models in Python using `PyMC` reproduces the results obtained from `brms::brm` in R with only rounding differences.
@@ -364,6 +366,7 @@ range_dist = data_2["ln_nuclear_dist_km"].max() - data_2["ln_nuclear_dist_km"].m
 ```
 
 Re-run of `m0`:
+
 ```{python}
 #| echo: true
 #| warning: false
@@ -402,6 +405,7 @@ print(az.summary(idata, var_names=["b", "sigma"], round_to=3, ci_prob=0.95))
 ```
 
 Re-run of `m1`:
+
 ```{python}
 #| echo: true
 #| warning: false
@@ -446,6 +450,7 @@ for label, col in [("RPSReactor", "RPS[T.Reactor]"), ("LOCLocal", "LOC[T.Local]"
 ```
 
 Re-run of `m2`:
+
 ```{python}
 #| echo: true
 #| warning: false
@@ -490,6 +495,7 @@ for label, col in [("RPSReactor", "RPS[T.Reactor]"), ("LOCLocal", "LOC[T.Local]"
 ```
 
 Re-run of `m3`:
+
 ```{python}
 #| echo: true
 #| warning: false
