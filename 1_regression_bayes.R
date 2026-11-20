@@ -223,7 +223,7 @@ wtd.cor(x = (select(data.1, local_econ, local_envt)),
         weight = data.1$weight) %>%
   pluck(., "correlation")
 
-wtd.cor(x = (select(data.1, elec_envt_friendly, need_more_elec, elec_self_suff, elec_price_low)),
+wtd.cor(x = (select(data.1, need_more_elec, elec_self_suff, elec_price_low)),
         weight = data.1$weight) %>%
   pluck(., "correlation")
 
@@ -292,6 +292,19 @@ range_centre <- function(x, w = NULL) {
   x <- x - weighted.mean(x, w, na.rm = TRUE)
 }
 
+wtd_summary <- function(x, w, na.rm = TRUE, digits = 5) {
+  if (na.rm) {
+    valid <- !is.na(x) & !is.na(w)
+    x <- x[valid]
+    w <- w[valid]
+  }
+  qt <- Hmisc::wtd.quantile(x, w, probs = c(0, .25, .5, .75, 1))
+  m <- Hmisc::wtd.mean(x, w)
+  out <- c(qt[1:3], Mean = m, qt[4:5])
+  names(out) <- c("Min.", "1st Qu.", "Median", "Mean", "3rd Qu.", "Max.")
+  round(out, digits)
+}
+
 data.2 <- data.1 %>%
   bind_cols(., (lavPredict(object = cfa_fit, type = "lv", method = "EBM", append.data = FALSE) %>%
                   as.data.frame() %>% as_tibble())) %>%
@@ -314,19 +327,19 @@ data.2 <- data.1 %>%
   mutate(left_right = case_when(left_right %in% 1:5 ~ left_right, TRUE ~ 3)) %>%
   mutate(left_right = range_centre(x = left_right, w = weight))
   
-summary(data.2$support_smr)
-summary(data.2$ln_age_years)
-summary(data.2$follow_elec)
-summary(data.2$need_more_elec)
-summary(data.2$elec_self_suff)
-summary(data.2$elec_price_low)
-summary(data.2$local_econ)
-summary(data.2$local_envt)
-summary(data.2$trust_govt)
-summary(data.2$trust_elec)
-summary(data.2$climate)
-summary(data.2$left_right)
-summary(data.2$ln_nuclear_dist_km)
+wtd_summary(data.2$support_smr, data.2$weight)
+wtd_summary(data.2$ln_age_years, data.2$weight)
+wtd_summary(data.2$follow_elec, data.2$weight)
+wtd_summary(data.2$need_more_elec, data.2$weight)
+wtd_summary(data.2$elec_self_suff, data.2$weight)
+wtd_summary(data.2$elec_price_low, data.2$weight)
+wtd_summary(data.2$local_econ, data.2$weight)
+wtd_summary(data.2$local_envt, data.2$weight)
+wtd_summary(data.2$trust_govt, data.2$weight)
+wtd_summary(data.2$trust_elec, data.2$weight)
+wtd_summary(data.2$climate, data.2$weight)
+wtd_summary(data.2$left_right, data.2$weight)
+wtd_summary(data.2$ln_nuclear_dist_km, data.2$weight)
 
 data.2a <- data.2 %>%
   filter_out(support_smr_nr == -9)
@@ -1857,7 +1870,7 @@ fig.0
 
 ## Fig. 2: Coefficient plot
 coef.ci.m1 <- m1 %>%
-  broom::tidy(., conf.int = TRUE) %>%
+  broom.mixed::tidy(., conf.int = TRUE) %>%
   filter(effect == "fixed") %>%
   bind_rows(., tribble(~term, "England (ref.)", "Power station frame (ref.)", "UK frame (ref.)")) %>%
   mutate(model.name = "Model 1") %>%
@@ -1887,7 +1900,7 @@ coef.ci.m1 <- m1 %>%
   select(model.name, term, estimate, LCL, UCL, reference)
 
 coef.ci.m2 <- m2 %>%
-  broom::tidy(., conf.int = TRUE) %>%
+  broom.mixed::tidy(., conf.int = TRUE) %>%
   filter(effect == "fixed") %>%
   bind_rows(., tribble(~term, "England (ref.)", "Power station frame (ref.)", "UK frame (ref.)")) %>%
   mutate(model.name = "Model 2") %>%
@@ -1917,7 +1930,7 @@ coef.ci.m2 <- m2 %>%
   select(model.name, term, estimate, LCL, UCL, reference)
   
 coef.ci.m3 <- m3 %>%
-  broom::tidy(., conf.int = TRUE) %>%
+  broom.mixed::tidy(., conf.int = TRUE) %>%
   filter(effect == "fixed") %>%
   bind_rows(., tribble(~term, "England (ref.)", "Power station frame (ref.)", "UK frame (ref.)")) %>%
   mutate(model.name = "Model 3") %>%
